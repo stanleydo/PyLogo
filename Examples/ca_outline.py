@@ -204,7 +204,30 @@ class CA_World(OnOffWorld):
         Copy values from self.ca_lines to the patches. One issue is dealing with
         cases in which there are more or fewer lines than Patch row.
         """
-        ...
+        # Create a current row counter
+        cur_row = 0
+        # self.ca_lines represents a list of lists ..
+        # [[0, 1, 0, 1, 1, 1, .... 0], ... [0, 0, 0, 1, 0, 1 .... 1]]
+        # We can iterate through each list in self.ca_lines
+        # Doing this, we can make sure we set the same amount of rows.
+        for line in self.ca_lines:
+            # We can use the cur_row index of the reversed patches_array
+            '''
+            The patches array is a 2D array that contains all the patches on the board.
+            We can use this to access patches using a row by column structure and set them to the correct value.
+            View world_patch_block.py (World Superclass) to see how it is generated.
+            '''
+            # We reverse (self.patches_array[::-1]) the patches_array so we can start on the bottom
+            # (Rows start from the top normally)
+            # We use cur_row to index the patch_row. This will give us a list of all the patch objects in that row.
+            patch_row = self.patches_array[::-1][cur_row]
+            # Create a line index counter
+            line_index = 0
+            # Set the patch to either on or off depending on line[line_index]
+            for patch in patch_row:
+                patch.set_on_off(line[line_index])
+                line_index += 1
+            cur_row += 1
 
     def set_switches_from_rule_nbr(self):
         """
@@ -270,17 +293,12 @@ class CA_World(OnOffWorld):
         Copy (the settings on) that line to the bottom row of patches.
         Note that the lists in self.ca_lines are lists of 0/1. They are not lists of Patches.
         """
-        # super().setup()
-        # for patch in self.patches_array[0]
-        cur_row = SimEngine.gui_get('rows')
-        line = self.build_initial_line()
-        i = 0
-        # print(self.patches_array)
-        for patch in self.patches_array[-1]:
-            # print(patch_arr)
-            # print('next')
-            patch.set_on_off(bool(line[i]))
-            i += 1
+        # Reset self.ca_lines
+        self.ca_lines = []
+        # Build initial line and append it to self.ca_lines
+        self.ca_lines.append(self.build_initial_line())
+        # Update the display based off of self.ca_lines
+        self.set_display_from_lines()
 
     def step(self):
         """
