@@ -11,6 +11,20 @@ import core.utils as utils
 
 class XY(tuple):
 
+    # Override the built-in "__eq__" method from Python's tuple()
+    def __eq__(self, other):
+        # Check if the types are the same.
+        if type(other) == type(self):
+            # Check if they are even in length
+            if len(self) != len(other):
+                return False
+            # Compare each element at the same index
+            for i in range(len(self)):
+                if self[i] != other[i]:
+                    return False
+            return True
+        return False
+
     def __add__(self, xy: XY):
         xx = self[0] + xy[0]
         yy = self[1] + xy[1]

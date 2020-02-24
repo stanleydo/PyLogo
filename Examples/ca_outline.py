@@ -33,7 +33,8 @@ class CA_World(OnOffWorld):
         pos_to_switch_a = {2**i: bin_str(i, 3) for i in range(8)}
         pos_to_switch_b = dict(zip([2**i for i in range(8)], CA_World.bin_0_to_7))
         assert pos_to_switch_a == pos_to_switch_b
-        self.pos_to_switch = ...  # pos_to_switch_a or pos_to_switch_b
+        # self.pos_to_switch = ...  # pos_to_switch_a or pos_to_switch_b
+        self.pos_to_switch = pos_to_switch_a
 
         # The rule number used for this run, initially set to 110 as the default rule.
         # (You might also try rule 165.)
@@ -42,6 +43,8 @@ class CA_World(OnOffWorld):
         # Set the switches and the binary representation of self.rule_nbr.
         self.set_switches_from_rule_nbr()
         self.set_binary_nbr_from_rule_nbr()
+        self.get_rule_nbr_from_switches()
+        self.make_switches_and_rule_nbr_consistent()
         self.init = None
 
         # self.ca_lines is a list of lines, each of which is a list of 0/1. Each line represents
@@ -108,14 +111,31 @@ class CA_World(OnOffWorld):
         Returns: The next state of the CA.
         """
         ...
-        return new_line
+        # return new_line
+        return None
 
     def get_rule_nbr_from_switches(self):
         """
         Translate the on/off of the switches to a rule number.
         This is the inverse of set_switches_from_rule_nbr(), but it doesn't set the 'Rule_nbr' Slider.
         """
-        ...
+        rule_nbr = 0
+        for i in range(8):
+            # for every element in range(8) -> [0,1,2,3,4,5,6,7]
+            # 0, 1, 2, 4, 8, 16, 32 ...
+            # 2^0, 2^1, 2^2 ...
+            dec_value = 2 ** i
+
+            # switch_key = '000', '001', '002'
+            switch_key = self.pos_to_switch[dec_value]
+            # 1 or 0, depending on checkbox
+            # Implementation of SimEngine.gui_get(switch_key) runs into a None Type error
+            switch_value = gui.WINDOW[switch_key].Get()
+            # switch_value = SimEngine.gui_get(str(switch_key))
+
+            rule_nbr += (2 ** i) * switch_value
+
+        return rule_nbr
 
     def handle_event(self, event):
         """
@@ -125,17 +145,27 @@ class CA_World(OnOffWorld):
 
         This is the function that will trigger all the code you write this week
         """
-        # Handle color change requests.
+        # Let OnOffWorld handle color change requests.
         super().handle_event(event)
 
-        if event in ['Rule_nbr'] + CA_World.bin_0_to_7:
-            self.make_switches_and_rule_nbr_consistent()
+        # Handle switches and rule slider
+        if event in ['Rule_nbr']:
+            self.rule_nbr = SimEngine.gui_get('Rule_nbr')
+        elif event in self.bin_0_to_7:
+            self.rule_nbr = self.get_rule_nbr_from_switches()
+        else:
+            pass
+        self.make_switches_and_rule_nbr_consistent()
 
     def make_switches_and_rule_nbr_consistent(self):
         """
         Make the Slider, the switches, and the bin number consistent: all should contain self.rule_nbr.
         """
-        ...
+        # gui.WINDOW['Rule_nbr'].update(value=self.rule_nbr)
+        SimEngine.gui_set('Rule_nbr', value=self.rule_nbr)
+        self.set_switches_from_rule_nbr()
+        self.set_binary_nbr_from_rule_nbr()
+
 
     def set_binary_nbr_from_rule_nbr(self):
         """
@@ -147,7 +177,12 @@ class CA_World(OnOffWorld):
         Use gui.WINDOW['bin_string'].update(value=new_value) to update the value of the widget.
         Use SimEngine.gui_set('bin_string', value=new_value) to update the value of the widget.
         """
-        ...
+        binary_list = self.rule_nbr_to_binary_list()
+        # [0, 0, 0, 1]
+        # ['0', '0', '0', '1']
+        binary_list_to_strs = [str(x) for x in binary_list]
+        rule_nbr_to_bin_str = ''.join(binary_list_to_strs)
+        SimEngine.gui_set('bin_string', value=rule_nbr_to_bin_str)
 
     def set_display_from_lines(self):
         """
@@ -161,14 +196,51 @@ class CA_World(OnOffWorld):
         Update the settings of the switches based on self.rule_nbr.
         Note that the 2^i position of self.rule_nbr corresponds to self.pos_to_switch[i]. That is,
         self.pos_to_switch[i] returns the key for the switch representing position  2^i.
-
         Set that switch as follows: gui.WINDOW[self.pos_to_switch[pos]].update(value=new_value).
         Set that switch as follows: SimEngine.gui_set(self.pos_to_switch[pos], value=new_value).
         (new_value will be either True or False, i.e., 1 or 0.)
-
         This is the inverse of get_rule_nbr_from_switches().
         """
-        ...
+
+        # List of 0s and 1s... based off of rule number (binary)
+        # [0, 1, 1, 0, 1, 1, 1, 0]
+        rule_nbr_to_binary = list(reversed(self.rule_nbr_to_binary_list()))
+
+        for i in range(8):
+            # for every element in range(8) -> [0,1,2,3,4,5,6,7]
+            dec_value = 2 ** i
+            SimEngine.gui_set(self.pos_to_switch[dec_value], value=rule_nbr_to_binary[i])
+            # checks every element in the list if it is a 0
+            # If there is a zero, then the method tells the gui to uncheck the switch at
+            # the position corresponding to dec_value. If there is a 1, then
+            # it is checked
+
+    def rule_nbr_to_binary_list(self):
+        # Rule number is a decimal value.. ex.. 110
+        # Method takes the decimal value of the rule number and uses a range of 8 to determine
+        # if a 1 or a 0 is added to an array
+        temp_rule_nbr = self.rule_nbr
+        rule_nbr_to_binary = []
+        # Range(8) is an iterator 0, 1, 2, 3, ... 7
+        # Reverse it to make it 7, 6, 5, ... 0
+        for i in reversed(range(8)):
+            # use a sequence incrementing down from 7 to 0 with i being an element in the sequence
+            dec_value = 2 ** i
+            if temp_rule_nbr >= dec_value:
+                temp_rule_nbr -= dec_value
+                rule_nbr_to_binary.append(1)
+            else:
+                rule_nbr_to_binary.append(0)
+                # ex. let temp_rule_nbr = 150
+                # 150 > 128, 150-128 = 22, [1]
+                # 22 < 64, 22, [1,0]
+                # 22 < 32, 22, [1,0,0]
+                # 22 > 16, 6, [1,0,0,1]
+                # 6 < 8, 6, [1,0,0,1,0]
+                # 6 > 4, 2, [1,0,0,1,0,1]
+                # 2 = 2, 0, [1,0,0,1,0,1,1]
+                # [1,0,0,1,0,1,1,0]
+        return rule_nbr_to_binary
 
     def setup(self):
         """
