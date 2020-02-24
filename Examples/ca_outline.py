@@ -51,18 +51,24 @@ class CA_World(OnOffWorld):
         # a state of the CA, i.e., all the cells in the line. self.ca_list contains the entire
         # history of the CA.
         self.ca_lines: List[List[int]] = []
-        # gui.WINDOW['rows'].update(value=len(self.ca_lines))
+        #
         SimEngine.gui_set('rows', value=len(self.ca_lines))
 
     def build_initial_line(self):
         """
         Construct the initial CA line
         """
-        self.init = SimEngine.gui_get('init')
+        self.init = SimEngine.gui_get(key='init')
         if self.init == 'Random':
             # Set the initial row to random 1/0.
             # You complete this line.
-            line = ...
+            # Line is basically a list of 0's or 1's with a length of "ca_display_size".
+            """
+            I wrote a list comprehension that uses random.choice() which picks a random 1 or 0
+            for every '_' in the range(self.ca_display_size). Note that we don't actually use '_',
+            it's just there to say I want a random choice ca_display_size many times.
+            """
+            line = [choice([0,1]) for _ in range(self.ca_display_size)]
         else:
             line = [0] * self.ca_display_size
             col = 0 if self.init == 'Left' else \
@@ -146,11 +152,20 @@ class CA_World(OnOffWorld):
         This is the function that will trigger all the code you write this week
         """
         # Let OnOffWorld handle color change requests.
+        '''
+        We call super().handle_event(event) we want the handle_event method associated
+        with the superclass 'onOffWorld, rather than the one in this class.
+        The handle_event method in the super class handles the events in the color pickers,
+        "SELECT_ON_TEXT" and "SELECT_OFF_TEXT" first before we proceed with changing sliders/switches/rule numbers.
+        If we don't have super().handle_event(event), the colors wouldn't change unless we added the color handling
+        specifically within this method.
+        '''
         super().handle_event(event)
 
         # Handle switches and rule slider
         if event in ['Rule_nbr']:
             self.rule_nbr = SimEngine.gui_get('Rule_nbr')
+        # self.bin_0_to_7 is essentially a list of all the checkbox keys
         elif event in self.bin_0_to_7:
             self.rule_nbr = self.get_rule_nbr_from_switches()
         else:
@@ -255,7 +270,17 @@ class CA_World(OnOffWorld):
         Copy (the settings on) that line to the bottom row of patches.
         Note that the lists in self.ca_lines are lists of 0/1. They are not lists of Patches.
         """
-        ...
+        # super().setup()
+        # for patch in self.patches_array[0]
+        cur_row = SimEngine.gui_get('rows')
+        line = self.build_initial_line()
+        i = 0
+        # print(self.patches_array)
+        for patch in self.patches_array[-1]:
+            # print(patch_arr)
+            # print('next')
+            patch.set_on_off(bool(line[i]))
+            i += 1
 
     def step(self):
         """
