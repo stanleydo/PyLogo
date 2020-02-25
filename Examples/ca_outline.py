@@ -204,6 +204,16 @@ class CA_World(OnOffWorld):
         Copy values from self.ca_lines to the patches. One issue is dealing with
         cases in which there are more or fewer lines than Patch row.
         """
+        # Review by: Wilson Weng
+        # The method follows standard PEP 8 indentation and spacing rules.
+        # The method creates a current row counter(cur_row)
+        # Takes the List line defined by build_initial_line
+        # Uses a for loop within a for loop to set patches in a row on or off for each row
+        # patches are listed by using cur_row to index patch_row
+        # patch row uses[::-1] which reverses the patches_array to start from the bottom
+        # line_index is used to determine if a patch is set to on or off with patch.set_on_off
+        # line_index and cur_row are incremented by one as the for loops run
+
         # Create a current row counter
         cur_row = 0
         # self.ca_lines represents a list of lists ..
@@ -293,6 +303,13 @@ class CA_World(OnOffWorld):
         Copy (the settings on) that line to the bottom row of patches.
         Note that the lists in self.ca_lines are lists of 0/1. They are not lists of Patches.
         """
+        # Review by: Wilson Weng
+        # The method follows standard PEP 8 indentation and spacing rules.
+        # The method sets ca_lines with an empty array to reset any changes
+        # The method then adds to ca_lines with values from build_initial_line()
+        # values from build_initial_line() dependant on the value select from the Initial Row GUI
+        # The method finally calls set_display_from_lines() to setup the first line
+
         # Reset self.ca_lines
         self.ca_lines = []
         # Build initial line and append it to self.ca_lines
@@ -309,17 +326,35 @@ class CA_World(OnOffWorld):
         (d) Copy self.ca_lines to the display
         """
         # (a)
-        new_line = ... # The new state derived from self.ca_lines[-1]
+        # new_line should be a list of 1s and 0s to represent each patch in the line
+        # Assign a list to new_line using the method generate_new_line_from_current_line(prev_line)
+        # The parameter for generate_new_line_from_current_line is the most recent line, or self.ca_lines[len(self.ca_lines)-1]
+        new_line = ...  # The new state derived from self.ca_lines[-1]
 
         # (b)
-        ... # Extend lines in self.ca_lines at each end as needed.
+        # Extend lines in self.ca_lines at each end as needed.
+        if len(new_line) > len(self.ca_lines[len(self.ca_lines) - 1]):
+            for line in self.ca_lines:
+                # add 0s to the begining and end of each line so they're the same length as new_line
+                ...
 
         # (c)
-        trimmed_new_line = ... # Drop extraneous 0s at the end of new_line
-        ... # Add trimmed_new_line to the end of self.ca_lines
+        # Drop extraneous 0s at the end of new_line
+        # Create a temporary list and assign it the reverse of new_line
+        new_line_reverse = ...  # new_line.reverse()
+
+        for patch in new_line_reverse:
+            if patch == 0:
+                ...  # new_line_reverse.pop(0)
+            else:
+                ...  # pass
+
+        trimmed_new_line = ...  # new_line_reverse.reverse()
+        # Add trimmed_new_line to the end of self.ca_lines
+        self.ca_lines.append(trimmed_new_line)
 
         # (d)
-        ... # Refresh the display from self.ca_lines
+        self.set_display_from_lines()  # Refresh the display from self.ca_lines
 
 
 
@@ -330,6 +365,13 @@ import PySimpleGUI as sg
 The following appears at the top-left of the window. 
 It puts a row consisting of a Text widgit and a ComboBox above the widgets from on_off.py
 """
+# By: Wilson Weng
+# The method takes PySimpleGui and creates Initial Row and Rows with sg.Text()
+# Initial Row is a combo box containing Left, Right ,Center, and Random all set as values
+# also sets a key 'init' and defaults to Right
+# Rows shows the amount of rows that the program created with a key 'rows'
+# values and key in 'Inital Row' are sent to the method build_initial_line
+# key in Rows is sent to __init__
 ca_left_upper = [[sg.Text('Initial row:'),
                   sg.Combo(values=['Left', 'Center', 'Right', 'Random'], key='init', default_value='Right')],
                  [sg.Text('Rows:'), sg.Text('     0', key='rows')],
@@ -348,6 +390,12 @@ switches = [sg.CB(n + '\n 1', key=n, pad=((30, 0), (0, 0)), enable_events=True)
 This  material appears above the screen: 
 the rule number slider, its binary representation, and the switch settings.
 """
+# By: Wilson Weng
+# The method takes PySimpleGui to create the rule rule number slider, its binary representation, # and the switch settings
+# Whenever the slider is moved, values above the slider and the binary rep. are changed as well
+# as the switches below
+# pads and keys are used by methods set_binary_nbr_from_rule_nbr to update the GUi
+# set_switches_from_rule_nbr uses values to update the switches
 ca_right_upper = [[sg.Text('Rule number', pad=((100, 0), (20, 10))),
                    sg.Slider(key='Rule_nbr', range=(0, 255), orientation='horizontal',
                              enable_events=True, pad=((10, 20), (0, 10))),
