@@ -1,4 +1,6 @@
 
+from __future__ import annotations
+
 import core.gui as gui
 from core.gui import HOR_SEP
 from core.on_off import on_off_left_upper, OnOffPatch, OnOffWorld
@@ -6,6 +8,8 @@ from core.sim_engine import SimEngine
 from core.utils import bin_str
 
 from copy import copy
+
+from itertools import chain, repeat
 
 from random import choice
 
@@ -70,10 +74,11 @@ class CA_World(OnOffWorld):
             """
             line = [choice([0,1]) for _ in range(self.ca_display_size)]
         else:
-            line = [0] * self.ca_display_size
-            col = 0 if self.init == 'Left' else \
-                  CA_World.ca_display_size // 2 if self.init == 'Center' else \
-                  CA_World.ca_display_size - 1   # self.init == 'Right'
+            line_length = self.ca_display_size if SimEngine.gui_get('000') else 1
+            line = [0] * line_length
+            col = 0                if init == 'Left' else \
+                  line_length // 2 if init == 'Center' else \
+                  line_length - 1   # init == 'Right'
             line[col] = 1
         return line
 
@@ -201,8 +206,12 @@ class CA_World(OnOffWorld):
 
     def set_display_from_lines(self):
         """
-        Copy values from self.ca_lines to the patches. One issue is dealing with
-        cases in which there are more or fewer lines than Patch row.
+        Copy values from self.ca_lines to the patches. There are two issues.
+        1. Is self.ca_lines longer/shorter than the number of Patch rows in the display?
+        2. Are there more/fewer cells-per-line than Patches-per-row?
+        What do you do in each case?
+
+        This is the most difficult method. Here is the outline I used.
         """
         # Review by: Wilson Weng
         # The method follows standard PEP 8 indentation and spacing rules.
@@ -321,9 +330,9 @@ class CA_World(OnOffWorld):
         """
         Take one step in the simulation.
         (a) Generate an additional line for the ca. (Use a copy of self.ca_lines[-1].)
-        (b) Extend all lines in ca_lines if the new line is longer than its predecessor.
+        (b) Extend all lines in ca_lines if the new line is longer (with additional 1's) than its predecessor.
         (c) Trim the new line and add to self.ca_lines
-        (d) Copy self.ca_lines to the display
+        (d) Refresh display from values in self.ca_lines.
         """
         # (a)
         # new_line should be a list of 1s and 0s to represent each patch in the line
@@ -383,19 +392,12 @@ ca_left_upper = [[sg.Text('Initial row:'),
 # The pos_to_switch dictionary maps position values in the rule number as a binary number
 # to these widgets. Each widget corresponds to a position in the rule number.
 # Note how we generate the text for the chechboxes.
-switches = [sg.CB(n + '\n 1', key=n, pad=((30, 0), (0, 0)), enable_events=True)
-                                             for n in reversed(CA_World.bin_0_to_7)]
+switches = [sg.CB(n + '\n 1', key=n, pad=((30, 0), (0, 0)), enable_events=True) for n in reversed(CA_World.bin_0_to_7)]
 
 """ 
 This  material appears above the screen: 
 the rule number slider, its binary representation, and the switch settings.
 """
-# By: Wilson Weng
-# The method takes PySimpleGui to create the rule rule number slider, its binary representation, # and the switch settings
-# Whenever the slider is moved, values above the slider and the binary rep. are changed as well
-# as the switches below
-# pads and keys are used by methods set_binary_nbr_from_rule_nbr to update the GUi
-# set_switches_from_rule_nbr uses values to update the switches
 ca_right_upper = [[sg.Text('Rule number', pad=((100, 0), (20, 10))),
                    sg.Slider(key='Rule_nbr', range=(0, 255), orientation='horizontal',
                              enable_events=True, pad=((10, 20), (0, 10))),
