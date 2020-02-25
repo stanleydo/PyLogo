@@ -76,10 +76,11 @@ class CA_World(OnOffWorld):
         else:
             line_length = self.ca_display_size if SimEngine.gui_get('000') else 1
             line = [0] * line_length
-            col = 0                if init == 'Left' else \
-                  line_length // 2 if init == 'Center' else \
+            col = 0 if self.init == 'Left' else \
+                  line_length // 2 if self.init == 'Center' else \
                   line_length - 1   # init == 'Right'
             line[col] = 1
+            print(line)
         return line
 
     @staticmethod
