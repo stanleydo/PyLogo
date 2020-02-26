@@ -11,6 +11,8 @@ from copy import copy
 
 from itertools import chain, repeat
 
+import numpy as np
+
 from random import choice
 
 from typing import List
@@ -49,21 +51,19 @@ class CA_World(OnOffWorld):
         self.set_binary_nbr_from_rule_nbr()
         self.get_rule_nbr_from_switches()
         self.make_switches_and_rule_nbr_consistent()
-        self.init = None
 
         # self.ca_lines is a list of lines, each of which is a list of 0/1. Each line represents
         # a state of the CA, i.e., all the cells in the line. self.ca_list contains the entire
         # history of the CA.
         self.ca_lines: List[List[int]] = []
-        #
         SimEngine.gui_set('rows', value=len(self.ca_lines))
 
     def build_initial_line(self):
         """
         Construct the initial CA line
         """
-        self.init = SimEngine.gui_get(key='init')
-        if self.init == 'Random':
+        init = SimEngine.gui_get('justification')
+        if init == 'Random':
             # Set the initial row to random 1/0.
             # You complete this line.
             # Line is basically a list of 0's or 1's with a length of "ca_display_size".
@@ -76,11 +76,10 @@ class CA_World(OnOffWorld):
         else:
             line_length = self.ca_display_size if SimEngine.gui_get('000') else 1
             line = [0] * line_length
-            col = 0 if self.init == 'Left' else \
-                  line_length // 2 if self.init == 'Center' else \
+            col = 0                if init == 'Left' else \
+                  line_length // 2 if init == 'Center' else \
                   line_length - 1   # init == 'Right'
             line[col] = 1
-            print(line)
         return line
 
     @staticmethod
@@ -123,31 +122,14 @@ class CA_World(OnOffWorld):
         Returns: The next state of the CA.
         """
         ...
-        # return new_line
-        return None
+        return new_line
 
     def get_rule_nbr_from_switches(self):
         """
         Translate the on/off of the switches to a rule number.
         This is the inverse of set_switches_from_rule_nbr(), but it doesn't set the 'Rule_nbr' Slider.
         """
-        rule_nbr = 0
-        for i in range(8):
-            # for every element in range(8) -> [0,1,2,3,4,5,6,7]
-            # 0, 1, 2, 4, 8, 16, 32 ...
-            # 2^0, 2^1, 2^2 ...
-            dec_value = 2 ** i
-
-            # switch_key = '000', '001', '002'
-            switch_key = self.pos_to_switch[dec_value]
-            # 1 or 0, depending on checkbox
-            # Implementation of SimEngine.gui_get(switch_key) runs into a None Type error
-            switch_value = gui.WINDOW[switch_key].Get()
-            # switch_value = SimEngine.gui_get(str(switch_key))
-
-            rule_nbr += (2 ** i) * switch_value
-
-        return rule_nbr
+        ...
 
     def handle_event(self, event):
         """
@@ -214,49 +196,89 @@ class CA_World(OnOffWorld):
 
         This is the most difficult method. Here is the outline I used.
         """
-        # Review by: Wilson Weng
-        # The method follows standard PEP 8 indentation and spacing rules.
-        # The method creates a current row counter(cur_row)
-        # Takes the List line defined by build_initial_line
-        # Uses a for loop within a for loop to set patches in a row on or off for each row
-        # patches are listed by using cur_row to index patch_row
-        # patch row uses[::-1] which reverses the patches_array to start from the bottom
-        # line_index is used to determine if a patch is set to on or off with patch.set_on_off
-        # line_index and cur_row are incremented by one as the for loops run
+        # Get the current setting of 'justification'.
+        init = SimEngine.gui_get('justification')
 
-        # Create a current row counter
-        cur_row = 0
-        # self.ca_lines represents a list of lists ..
-        # [[0, 1, 0, 1, 1, 1, .... 0], ... [0, 0, 0, 1, 0, 1 .... 1]]
-        # We can iterate through each list in self.ca_lines
-        # Doing this, we can make sure we set the same amount of rows.
-        for line in self.ca_lines:
-            # We can use the cur_row index of the reversed patches_array
-            '''
-            The patches array is a 2D array that contains all the patches on the board.
-            We can use this to access patches using a row by column structure and set them to the correct value.
-            View world_patch_block.py (World Superclass) to see how it is generated.
-            '''
-            # We reverse (self.patches_array[::-1]) the patches_array so we can start on the bottom
-            # (Rows start from the top normally)
-            # We use cur_row to index the patch_row. This will give us a list of all the patch objects in that row.
-            patch_row = self.patches_array[::-1][cur_row]
-            # Create a line index counter
-            line_index = 0
-            # Set the patch to either on or off depending on line[line_index]
-            for patch in patch_row:
-                patch.set_on_off(line[line_index])
-                line_index += 1
-            cur_row += 1
+        # Get the two relevant widths.
+        display_width = gui.PATCH_COLS
+
+        # All the lines in self.ca_lies are the same length.
+        ca_line_width = len(self.ca_lines[0])
+
+        # How many blanks must be prepended to the line to be displayed to fill the display row?
+        # Will be 0 if the ca_line is at least as long as the display row or the line is left-justified.
+        left_padding_needed = 0 if ca_line_width >= display_width or init == 'Left' else \
+                              ...
+
+        # Use [0]*n to get a list of n 0s to use as left padding.
+        left_padding = ...
+
+        # Which elements of the ca_line are to be displayed?
+        # More to the point, what is index of the first element of the line to be displayed?
+        # Will be 0 if the display width is greater than or equal to the line width or we are left-justifying.
+        left_ca_line_index = 0 if display_width >= ca_line_width or init == 'Left' else \
+                             ...
+
+        # Reverse self.ca_lines?
+        ca_lines_to_display = reversed(self.ca_lines)
+        # Reverse the rows of CA_World.patches_array
+        patch_rows_to_display_on = np.flip(CA_World.patches_array, axis=0)
+
+        # Now we can use zip to match up ca_lines_to_display and patch_rows_to_display on.
+        # In both cases we are starting at the bottom and working our way up.
+        ca_lines_patch_rows = zip(ca_lines_to_display, patch_rows_to_display_on)
+
+        # zip is given two iterables and produces a sequence of pairs of elements, one from each.
+        # An important feature of zip is that it stops whenever either of its arguments ends.
+        # In particular, the two arguments needn't be the same length. Zip simply uses all the
+        # elements of the shorter and pairs them with the initial elements of the longer.
+
+        # We can now step through the corresponding pairs.
+        for (ca_line, patch_row) in ca_lines_patch_rows:
+            # The values in ca_line are to be displayed on patch_row.
+            # The issue now is how to align them.
+
+            # Which elements of ca_line should be displayed?
+            # We display the elements starting at left_ca_line_index (computed above).
+            ca_line_portion = ...
+
+            # For the complete display line and the desired justification,
+            # we may need to pad ca_line_portion to the left or right (or both).
+            # We need left_padding_needed 0's to the left and an arbitrary sequence of 0's to the right.
+            # (Use repeat() from itertools for the padding on the right. It doesn't matter if it's too long!)
+
+            # Put the three pieces together to get the full line.
+            # Use chain() from itertools to combine the three parts of the line:
+            #          left_padding, ca_line_portion, right_padding.
+            padded_line = chain(..., ..., ...)
+            # padded_line has the right number of 0's at the left. It then contains the elements from ca_line
+            # to be displayed. If we need more elements to display, padded_line includes an unlimted number of
+            # trailing 0's.
+
+            # Since padded_line will be dispalyed on patch_row, we can use zip again to pair up the values
+            # from padded_line with the Patches in patch_row. Since padded_line includes an unlimited number
+            # of 0's at the end, zip will stop when it reaches the last Patch in patch_row.
+
+            ca_values_patchs = zip(padded_line, patch_row)
+
+            # Step through these value/patch pairs and put the values into the associated Patches.
+            for (ca_val, patch) in ca_values_patchs:
+                # Use the set_on_off method of OnOffPatch to set the patch to ca_val.
+                ...
+
+        # Update the 'rows' widget.
+        ...
 
     def set_switches_from_rule_nbr(self):
         """
         Update the settings of the switches based on self.rule_nbr.
         Note that the 2^i position of self.rule_nbr corresponds to self.pos_to_switch[i]. That is,
         self.pos_to_switch[i] returns the key for the switch representing position  2^i.
+
         Set that switch as follows: gui.WINDOW[self.pos_to_switch[pos]].update(value=new_value).
         Set that switch as follows: SimEngine.gui_set(self.pos_to_switch[pos], value=new_value).
         (new_value will be either True or False, i.e., 1 or 0.)
+
         This is the inverse of get_rule_nbr_from_switches().
         """
 
@@ -308,7 +330,7 @@ class CA_World(OnOffWorld):
         use the value derived from the switches as the new value of self.rule_nbr.
 
         Once the slider, the switches, and the bin_string of the rule number are consistent,
-        set self.ca_lines[0] as directed by SimEngine.gui_get('init').
+        set self.ca_lines[0] as directed by SimEngine.gui_get('justification').
 
         Copy (the settings on) that line to the bottom row of patches.
         Note that the lists in self.ca_lines are lists of 0/1. They are not lists of Patches.
@@ -336,36 +358,18 @@ class CA_World(OnOffWorld):
         (d) Refresh display from values in self.ca_lines.
         """
         # (a)
-        # new_line should be a list of 1s and 0s to represent each patch in the line
-        # Assign a list to new_line using the method generate_new_line_from_current_line(prev_line)
-        # The parameter for generate_new_line_from_current_line is the most recent line, or self.ca_lines[len(self.ca_lines)-1]
-        new_line = ...  # The new state derived from self.ca_lines[-1]
+        new_line = ... # The new state derived from self.ca_lines[-1]
 
         # (b)
-        # Extend lines in self.ca_lines at each end as needed.
-        if len(new_line) > len(self.ca_lines[len(self.ca_lines) - 1]):
-            for line in self.ca_lines:
-                # add 0s to the begining and end of each line so they're the same length as new_line
-                ...
+        ... # Extend lines in self.ca_lines at each end as needed. (Don't extend for extra 0's at the ends.)
+            # Can't drop the 0's first because we then lose track of which end was extended.
 
         # (c)
-        # Drop extraneous 0s at the end of new_line
-        # Create a temporary list and assign it the reverse of new_line
-        new_line_reverse = ...  # new_line.reverse()
-
-        for patch in new_line_reverse:
-            if patch == 0:
-                ...  # new_line_reverse.pop(0)
-            else:
-                ...  # pass
-
-        trimmed_new_line = ...  # new_line_reverse.reverse()
-        # Add trimmed_new_line to the end of self.ca_lines
-        self.ca_lines.append(trimmed_new_line)
+        trimmed_new_line = ... # Drop extraneous 0s at the end of new_line
+        ... # Add trimmed_new_line to the end of self.ca_lines
 
         # (d)
-        self.set_display_from_lines()  # Refresh the display from self.ca_lines
-
+        ... # Refresh the display from self.ca_lines
 
 
 # ############################################## Define GUI ############################################## #
@@ -382,8 +386,8 @@ It puts a row consisting of a Text widgit and a ComboBox above the widgets from 
 # Rows shows the amount of rows that the program created with a key 'rows'
 # values and key in 'Inital Row' are sent to the method build_initial_line
 # key in Rows is sent to __init__
-ca_left_upper = [[sg.Text('Initial row:'),
-                  sg.Combo(values=['Left', 'Center', 'Right', 'Random'], key='init', default_value='Right')],
+ca_left_upper = [[sg.Text('Row justification'),
+                  sg.Combo(values=['Left', 'Center', 'Right'], key='justification', default_value='Right')],
                  [sg.Text('Rows:'), sg.Text('     0', key='rows')],
                  HOR_SEP(30)] + \
                  on_off_left_upper
