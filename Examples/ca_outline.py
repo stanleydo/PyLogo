@@ -76,7 +76,7 @@ class CA_World(OnOffWorld):
         else:
             line_length = self.ca_display_size if SimEngine.gui_get('000') else 1
             line = [0] * line_length
-            col = 0                if init == 'Left' else \
+            col = 0 if init == 'Left' else \
                   line_length // 2 if init == 'Center' else \
                   line_length - 1   # init == 'Right'
             line[col] = 1
@@ -121,7 +121,14 @@ class CA_World(OnOffWorld):
             prev_line: The current state of the CA.
         Returns: The next state of the CA.
         """
-        ...
+        prev_copy = prev_line.copy()
+        prev_copy = [0, 0] + prev_copy + [0, 0]
+        new_line = []
+        # for i in list(range(len(prev_copy)))[1:len(prev_copy)-1]:
+        for i in range(len(prev_copy)-2):
+            neighbors = str(prev_copy[i]) + str(prev_copy[i+1]) + str(prev_copy[i+2])
+            new_line.append(int(SimEngine.gui_get(key=neighbors)))
+        print(new_line)
         return new_line
 
     def get_rule_nbr_from_switches(self):
@@ -129,7 +136,23 @@ class CA_World(OnOffWorld):
         Translate the on/off of the switches to a rule number.
         This is the inverse of set_switches_from_rule_nbr(), but it doesn't set the 'Rule_nbr' Slider.
         """
-        ...
+        rule_nbr = 0
+        for i in range(8):
+            # for every element in range(8) -> [0,1,2,3,4,5,6,7]
+            # 0, 1, 2, 4, 8, 16, 32 ...
+            # 2^0, 2^1, 2^2 ...
+            dec_value = 2 ** i
+
+            # switch_key = '000', '001', '002'
+            switch_key = self.pos_to_switch[dec_value]
+            # 1 or 0, depending on checkbox
+            # Implementation of SimEngine.gui_get(switch_key) runs into a None Type error
+            switch_value = gui.WINDOW[switch_key].Get()
+            # switch_value = SimEngine.gui_get(str(switch_key))
+
+            rule_nbr += (2 ** i) * switch_value
+
+        return rule_nbr
 
     def handle_event(self, event):
         """
@@ -207,17 +230,15 @@ class CA_World(OnOffWorld):
 
         # How many blanks must be prepended to the line to be displayed to fill the display row?
         # Will be 0 if the ca_line is at least as long as the display row or the line is left-justified.
-        left_padding_needed = 0 if ca_line_width >= display_width or init == 'Left' else \
-                              ...
+        left_padding_needed = 0 if ca_line_width >= display_width or init == 'Left' else self.ca_display_size//2
 
         # Use [0]*n to get a list of n 0s to use as left padding.
-        left_padding = ...
+        left_padding = [0]*left_padding_needed
 
         # Which elements of the ca_line are to be displayed?
         # More to the point, what is index of the first element of the line to be displayed?
         # Will be 0 if the display width is greater than or equal to the line width or we are left-justifying.
-        left_ca_line_index = 0 if display_width >= ca_line_width or init == 'Left' else \
-                             ...
+        left_ca_line_index = 0 if display_width >= ca_line_width or init == 'Left' else 1
 
         # Reverse self.ca_lines?
         ca_lines_to_display = reversed(self.ca_lines)
@@ -240,7 +261,7 @@ class CA_World(OnOffWorld):
 
             # Which elements of ca_line should be displayed?
             # We display the elements starting at left_ca_line_index (computed above).
-            ca_line_portion = ...
+            ca_line_portion = ca_line
 
             # For the complete display line and the desired justification,
             # we may need to pad ca_line_portion to the left or right (or both).
@@ -250,7 +271,7 @@ class CA_World(OnOffWorld):
             # Put the three pieces together to get the full line.
             # Use chain() from itertools to combine the three parts of the line:
             #          left_padding, ca_line_portion, right_padding.
-            padded_line = chain(..., ..., ...)
+            padded_line = chain(left_padding, ca_line_portion, left_padding)
             # padded_line has the right number of 0's at the left. It then contains the elements from ca_line
             # to be displayed. If we need more elements to display, padded_line includes an unlimted number of
             # trailing 0's.
@@ -264,7 +285,7 @@ class CA_World(OnOffWorld):
             # Step through these value/patch pairs and put the values into the associated Patches.
             for (ca_val, patch) in ca_values_patchs:
                 # Use the set_on_off method of OnOffPatch to set the patch to ca_val.
-                ...
+                patch.set_on_off(ca_val)
 
         # Update the 'rows' widget.
         ...
@@ -274,11 +295,9 @@ class CA_World(OnOffWorld):
         Update the settings of the switches based on self.rule_nbr.
         Note that the 2^i position of self.rule_nbr corresponds to self.pos_to_switch[i]. That is,
         self.pos_to_switch[i] returns the key for the switch representing position  2^i.
-
         Set that switch as follows: gui.WINDOW[self.pos_to_switch[pos]].update(value=new_value).
         Set that switch as follows: SimEngine.gui_set(self.pos_to_switch[pos], value=new_value).
         (new_value will be either True or False, i.e., 1 or 0.)
-
         This is the inverse of get_rule_nbr_from_switches().
         """
 
@@ -358,18 +377,21 @@ class CA_World(OnOffWorld):
         (d) Refresh display from values in self.ca_lines.
         """
         # (a)
-        new_line = ... # The new state derived from self.ca_lines[-1]
+        new_line = self.generate_new_line_from_current_line(self.ca_lines[-1]) # The new state derived from self.ca_lines[-1]
 
         # (b)
-        ... # Extend lines in self.ca_lines at each end as needed. (Don't extend for extra 0's at the ends.)
-            # Can't drop the 0's first because we then lose track of which end was extended.
+        # Extend lines in self.ca_lines at each end as needed. (Don't extend for extra 0's at the ends.)
+        # Can't drop the 0's first because we then lose track of which end was extended.
+
 
         # (c)
         trimmed_new_line = ... # Drop extraneous 0s at the end of new_line
-        ... # Add trimmed_new_line to the end of self.ca_lines
-
+        # Add trimmed_new_line to the end of self.ca_lines
+        self.ca_lines.append(new_line)
         # (d)
-        ... # Refresh the display from self.ca_lines
+
+        # Refresh the display from self.ca_lines
+        self.set_display_from_lines()
 
 
 # ############################################## Define GUI ############################################## #
