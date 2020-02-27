@@ -251,16 +251,34 @@ class CA_World(OnOffWorld):
         # elements of the shorter and pairs them with the initial elements of the longer.
 
         # We can now step through the corresponding pairs.
-        right_padding = [0]
+        right_padding = []
         for (ca_line, patch_row) in ca_lines_patch_rows:
             # The values in ca_line are to be displayed on patch_row.
             # The issue now is how to align them.
 
             # Which elements of ca_line should be displayed?
             # We display the elements starting at left_ca_line_index (computed above).
-            print("CA LINE: ", ca_line)
-            ca_line_portion = ca_line[int(len(ca_line)/2):]
-            print("PORTION: ", ca_line_portion)
+            # print("CA LINE: ", ca_line)
+            ca_line_portion = ca_line[int(len(ca_line)/2):] if init == 'Left' \
+                else ca_line if init == 'Center' \
+                else ca_line[:(len(ca_line)//2) + 1] if init == 'Right' else ca_line
+            num_pad_center = display_width // 2 - len(ca_line_portion) // 2
+            if init == 'Center' and num_pad_center > 0:
+                left_padding = [0] * num_pad_center
+            elif init == 'Center' and num_pad_center < 0:   
+                center_of_line = len(ca_line_portion)//2
+                start_to_display = center_of_line - display_width // 2
+                ca_line_portion = ca_line[start_to_display:center_of_line + (display_width//2)]
+                left_padding = []
+
+            num_pad_right = display_width - len(ca_line_portion)
+            if init == 'Right' and num_pad_right > 0:
+                left_padding = [0] * num_pad_right
+            elif init == 'Right' and num_pad_right < 0:
+                center_of_line = len(ca_line_portion)
+                start_to_display = center_of_line - display_width
+                ca_line_portion = ca_line[start_to_display:center_of_line]
+                left_padding = []
 
             # For the complete display line and the desired justification,
             # we may need to pad ca_line_portion to the left or right (or both).
@@ -270,7 +288,7 @@ class CA_World(OnOffWorld):
             # Put the three pieces together to get the full line.
             # Use chain() from itertools to combine the three parts of the line:
             #          left_padding, ca_line_portion, right_padding.
-            right_padding = right_padding + [0]
+            # right_padding = right_padding + [0]
             padded_line = chain(left_padding, ca_line_portion, right_padding)
             # padded_line has the right number of 0's at the left. It then contains the elements from ca_line
             # to be displayed. If we need more elements to display, padded_line includes an unlimted number of
