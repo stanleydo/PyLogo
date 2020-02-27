@@ -56,30 +56,25 @@ class CA_World(OnOffWorld):
         # a state of the CA, i.e., all the cells in the line. self.ca_list contains the entire
         # history of the CA.
         self.ca_lines: List[List[int]] = []
+        # gui.WINDOW['rows'].update(value=len(self.ca_lines))
         SimEngine.gui_set('rows', value=len(self.ca_lines))
 
     def build_initial_line(self):
         """
-        Construct the initial CA line
+        Construct the initial CA line.
+        It is a random line if SimEngine.gui_get('Random?').
+        It is a line (of length ca_display_size) if SimEngine.gui_get('init') == ''.
+        Otherwise it is the string in SimEngine.gui_get('init') converted into 0's and 1's.
+        (' ' and '0' are converted to 0; everything else is converted to 1.)
         """
-        init = SimEngine.gui_get('justification')
-        if init == 'Random':
-            # Set the initial row to random 1/0.
-            # You complete this line.
-            # Line is basically a list of 0's or 1's with a length of "ca_display_size".
-            """
-            I wrote a list comprehension that uses random.choice() which picks a random 1 or 0
-            for every '_' in the range(self.ca_display_size). Note that we don't actually use '_',
-            it's just there to say I want a random choice ca_display_size many times.
-            """
-            line = [choice([0,1]) for _ in range(self.ca_display_size)]
+        if SimEngine.gui_get('Random?'):
+            line = ...
+        elif SimEngine.gui_get('init') == '':
+            line = ...
         else:
-            line_length = self.ca_display_size if SimEngine.gui_get('000') else 1
-            line = [0] * line_length
-            col = 0 if init == 'Left' else \
-                  line_length // 2 if init == 'Center' else \
-                  line_length - 1   # init == 'Right'
-            line[col] = 1
+            line_0 = SimEngine.gui_get('init')
+            # Convert line_0 to 0's and 1's
+            line = ...
         return line
 
     @staticmethod
@@ -399,7 +394,6 @@ import PySimpleGUI as sg
 
 """ 
 The following appears at the top-left of the window. 
-It puts a row consisting of a Text widgit and a ComboBox above the widgets from on_off.py
 """
 # By: Wilson Weng
 # The method takes PySimpleGui and creates Initial Row and Rows with sg.Text()
@@ -410,9 +404,22 @@ It puts a row consisting of a Text widgit and a ComboBox above the widgets from 
 # key in Rows is sent to __init__
 ca_left_upper = [[sg.Text('Row justification'),
                   sg.Combo(values=['Left', 'Center', 'Right'], key='justification', default_value='Right')],
+
+                 [sg.Text('Initial row:',
+                          tooltip="0's and 1's for the initial row. An empty \n" +
+                                  "string will set the initial row to all 0's."),
+                  sg.Input(default_text="1", key='init', size=(20, None), justification='center')],
+
+                 [sg.CB('Random?', key='Random?', enable_events=True,
+                        tooltip="Set the initial row to random 0's and 1's.")],
+
+                 HOR_SEP(30, pad=(None, None)),
+
                  [sg.Text('Rows:'), sg.Text('     0', key='rows')],
-                 HOR_SEP(30)] + \
-                 on_off_left_upper
+
+                 HOR_SEP(30),
+
+                 *on_off_left_upper]
 
 # The switches are CheckBoxes with keys from CA_World.bin_0_to_7 (in reverse).
 # These are the actual GUI widgets, which we access via their keys.
