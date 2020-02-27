@@ -68,13 +68,15 @@ class CA_World(OnOffWorld):
         (' ' and '0' are converted to 0; everything else is converted to 1.)
         """
         if SimEngine.gui_get('Random?'):
-            line = ...
+            line = [choice([0,1]) for _ in range(self.ca_display_size)]
         elif SimEngine.gui_get('init') == '':
-            line = ...
+            line = [0] * self.ca_display_size
         else:
-            line_0 = SimEngine.gui_get('init')
+            line_0 = list(SimEngine.gui_get('init'))
+            # print("LINE 0 :", line_0)
             # Convert line_0 to 0's and 1's
-            line = ...
+
+            line = line_0
         return line
 
     @staticmethod
@@ -224,7 +226,7 @@ class CA_World(OnOffWorld):
 
         # How many blanks must be prepended to the line to be displayed to fill the display row?
         # Will be 0 if the ca_line is at least as long as the display row or the line is left-justified.
-        left_padding_needed = 0 if ca_line_width >= display_width or init == 'Left' else self.ca_display_size//2
+        left_padding_needed = 0 if ca_line_width >= display_width or init == 'Left' else int(display_width/2)
 
         # Use [0]*n to get a list of n 0s to use as left padding.
         left_padding = [0]*left_padding_needed
@@ -249,13 +251,16 @@ class CA_World(OnOffWorld):
         # elements of the shorter and pairs them with the initial elements of the longer.
 
         # We can now step through the corresponding pairs.
+        right_padding = [0]
         for (ca_line, patch_row) in ca_lines_patch_rows:
             # The values in ca_line are to be displayed on patch_row.
             # The issue now is how to align them.
 
             # Which elements of ca_line should be displayed?
             # We display the elements starting at left_ca_line_index (computed above).
-            ca_line_portion = ca_line
+            print("CA LINE: ", ca_line)
+            ca_line_portion = ca_line[int(len(ca_line)/2):]
+            print("PORTION: ", ca_line_portion)
 
             # For the complete display line and the desired justification,
             # we may need to pad ca_line_portion to the left or right (or both).
@@ -265,7 +270,8 @@ class CA_World(OnOffWorld):
             # Put the three pieces together to get the full line.
             # Use chain() from itertools to combine the three parts of the line:
             #          left_padding, ca_line_portion, right_padding.
-            padded_line = chain(left_padding, ca_line_portion, left_padding)
+            right_padding = right_padding + [0]
+            padded_line = chain(left_padding, ca_line_portion, right_padding)
             # padded_line has the right number of 0's at the left. It then contains the elements from ca_line
             # to be displayed. If we need more elements to display, padded_line includes an unlimted number of
             # trailing 0's.
@@ -371,7 +377,9 @@ class CA_World(OnOffWorld):
         (d) Refresh display from values in self.ca_lines.
         """
         # (a)
+        print("PREV: ", self.ca_lines[-1])
         new_line = self.generate_new_line_from_current_line(self.ca_lines[-1]) # The new state derived from self.ca_lines[-1]
+        print("NEXT: ", new_line)
 
         # (b)
         # Extend lines in self.ca_lines at each end as needed. (Don't extend for extra 0's at the ends.)
