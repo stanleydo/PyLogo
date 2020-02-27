@@ -195,7 +195,6 @@ class CA_World(OnOffWorld):
         the string '(01101110)' is stored in gui.WINDOW['bin_string']. Include
         the parentheses around the binary number.
 
-        Use gui.WINDOW['bin_string'].update(value=new_value) to update the value of the widget.
         Use SimEngine.gui_set('bin_string', value=new_value) to update the value of the widget.
         """
         binary_list = self.rule_nbr_to_binary_list()
@@ -405,10 +404,14 @@ The following appears at the top-left of the window.
 ca_left_upper = [[sg.Text('Row justification'),
                   sg.Combo(values=['Left', 'Center', 'Right'], key='justification', default_value='Right')],
 
-                 [sg.Text('Initial row:',
+                 HOR_SEP(30),
+
+                 [sg.Text('Initial row:', pad=(None, (20, 0)),
                           tooltip="0's and 1's for the initial row. An empty \n" +
                                   "string will set the initial row to all 0's."),
-                  sg.Input(default_text="1", key='init', size=(20, None), justification='center')],
+                  sg.Input(default_text="1", key='init', size=(20, None), text_color='white',
+                           background_color='steelblue4', justification='center')
+                ],
 
                  [sg.CB('Random?', key='Random?', enable_events=True,
                         tooltip="Set the initial row to random 0's and 1's.")],
@@ -417,16 +420,17 @@ ca_left_upper = [[sg.Text('Row justification'),
 
                  [sg.Text('Rows:'), sg.Text('     0', key='rows')],
 
-                 HOR_SEP(30),
+                 HOR_SEP(30, pad=(None, (0, 10)))
 
-                 *on_off_left_upper]
+                 ] + on_off_left_upper
+
 
 # The switches are CheckBoxes with keys from CA_World.bin_0_to_7 (in reverse).
 # These are the actual GUI widgets, which we access via their keys.
 # The pos_to_switch dictionary maps position values in the rule number as a binary number
 # to these widgets. Each widget corresponds to a position in the rule number.
 # Note how we generate the text for the chechboxes.
-switches = [sg.CB(n + '\n 1', key=n, pad=((30, 0), (0, 0)), enable_events=True) for n in reversed(CA_World.bin_0_to_7)]
+switches = [sg.CB(n+'\n 1', key=n, pad=((30, 0), (0, 0)), enable_events=True) for n in reversed(CA_World.bin_0_to_7)]
 
 """ 
 This  material appears above the screen: 
