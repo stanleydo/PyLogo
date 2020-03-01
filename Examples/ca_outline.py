@@ -63,20 +63,31 @@ class CA_World(OnOffWorld):
         """
         Construct the initial CA line.
         It is a random line if SimEngine.gui_get('Random?').
-        It is a line (of length ca_display_size) if SimEngine.gui_get('init') == ''.
-        Otherwise it is the string in SimEngine.gui_get('init') converted into 0's and 1's.
+        It is a line (of length ca_display_size) if SimEngine.gui_get('init_line') == ''.
+        Otherwise it is the string in SimEngine.gui_get('init_line') converted into 0's and 1's.
         (' ' and '0' are converted to 0; everything else is converted to 1.)
+        However, if the rule includes 000 -> 1,pad the line with 0's on both ends to fill the display.
+        How much to put on each end depends on the user-specific initial line and the requested justification.
         """
-        init_as_list = list(SimEngine.gui_get('init'))
         if SimEngine.gui_get('Random?'):
-            line = [choice([0,1]) for _ in range(self.ca_display_size*2)]
-        elif SimEngine.gui_get('init') == '':
-            line = [0] * self.ca_display_size
+            line = ...
         else:
-            line_0 = list([0] * (self.ca_display_size//2 - len(init_as_list)//2)) + init_as_list + list([0] * (self.ca_display_size//2 - len(init_as_list)//2))
-            # print("LINE 0 :", line_0)
-            # Convert line_0 to 0's and 1's
-            line = line_0
+            # A line of 0's.
+            padding = [0] * (self.ca_display_size)
+            if SimEngine.gui_get('init_line') == '':
+                line = padding
+            else:
+                line_0 = SimEngine.gui_get('init_line')
+                # Convert line_0 to 0's and 1's
+                line = [... for c in line_0]
+                # If the rule include 000 -> 1, fill out the new line with 0's.
+                if SimEngine.gui_get('000'):
+                    justification = SimEngine.gui_get('justification')
+                    line_len = len(line)
+                    actual_padding = padding[line_len:]
+                    line = ... if justification == 'Right' else \
+                           ... if justification == 'Left' else \
+                           ... #  justification == 'Center'
         return line
 
     @staticmethod
@@ -89,12 +100,6 @@ class CA_World(OnOffWorld):
 
         Returns: trimmed ca_state without extraneous 0 cells at the ends.
         """
-        # Creates a tuple of (first element in new_line, last element in new line)
-        if (new_line[0], new_line[-1]) == (0,0):
-            # If both ends are 0, we return a slice of the new_line that excludes the first and last element in the list.
-            return new_line[1:-1]
-        else:
-            return new_line
 
     def extend_ca_lines_if_needed(self, new_line):
         """
