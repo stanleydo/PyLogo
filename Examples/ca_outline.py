@@ -327,7 +327,6 @@ class CA_World(OnOffWorld):
                                   ca_line if justification == 'Center' else \
                                   ca_line[::-1][:display_width] if len(ca_line) > display_width and justification == 'Right' else \
                                   ca_line[::-1]
-
                 left_padding = [0] * ((len(self.ca_lines[-1]) // 2) - (len(ca_line) // 2))
 
             if justification == 'Center':
@@ -360,7 +359,7 @@ class CA_World(OnOffWorld):
             # of 0's at the end, zip will stop when it reaches the last Patch in patch_row.
 
             ca_values_patchs = zip(padded_line, patch_row)
-            if justification == 'Right':
+            if justification == 'Right' and not absolute:
                 ca_values_patchs = zip(padded_line, reversed(patch_row))
 
             # Step through these value/patch pairs and put the values into the associated Patches.
