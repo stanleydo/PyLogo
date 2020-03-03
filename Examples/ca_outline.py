@@ -265,7 +265,7 @@ class CA_World(OnOffWorld):
 
         # How many blanks must be prepended to the line to be displayed to fill the display row?
         # Will be 0 if the ca_line is at least as long as the display row or the line is left-justified.
-        left_padding_needed = 0 if ca_line_width >= display_width or justification == 'Left' else display_width//2
+        left_padding_needed = 0 if ca_line_width >= display_width or justification == 'Left' else 0
 
         # Use [0]*n to get a list of n 0s to use as left padding.
         left_padding = [0]*left_padding_needed
@@ -325,13 +325,11 @@ class CA_World(OnOffWorld):
             else:
                 ca_line_portion = ca_line[:display_width] if justification == 'Left' else \
                                   ca_line if justification == 'Center' else \
-                                  ca_line[-display_width:] if len(ca_line) > display_width and justification == 'Right' else \
-                                  ca_line
+                                  ca_line[::-1][:display_width] if len(ca_line) > display_width and justification == 'Right' else \
+                                  ca_line[::-1]
 
-                left_padding = [0] * ((len(self.ca_lines[-1])//2) - (len(ca_line)//2)) if justification == 'Left' else \
-                               [0] * (display_width - len(self.ca_lines[-1]) + (len(self.ca_lines[-1])//2) - (len(ca_line)//2)) if len(ca_line) < display_width else [0,0,0]
-                # right_padding = [0] * (len(ca_line))
-                # right_padding = []
+                left_padding = [0] * ((len(self.ca_lines[-1]) // 2) - (len(ca_line) // 2))
+
             if justification == 'Center':
                 num_pad = display_width // 2 - len(ca_line_portion) // 2
                 if num_pad > 0:
@@ -351,7 +349,7 @@ class CA_World(OnOffWorld):
             # Put the three pieces together to get the full line.
             # Use chain() from itertools to combine the three parts of the line:
             #          left_padding, ca_line_portion, right_padding.
-            # right_padding = right_padding + [0]
+
             padded_line = chain(left_padding, ca_line_portion, right_padding)
             # padded_line has the right number of 0's at the left. It then contains the elements from ca_line
             # to be displayed. If we need more elements to display, padded_line includes an unlimted number of
@@ -362,14 +360,13 @@ class CA_World(OnOffWorld):
             # of 0's at the end, zip will stop when it reaches the last Patch in patch_row.
 
             ca_values_patchs = zip(padded_line, patch_row)
+            if justification == 'Right':
+                ca_values_patchs = zip(padded_line, reversed(patch_row))
 
             # Step through these value/patch pairs and put the values into the associated Patches.
             for (ca_val, patch) in ca_values_patchs:
                 # Use the set_on_off method of OnOffPatch to set the patch to ca_val.
                 patch.set_on_off(ca_val)
-
-        # Update the 'rows' widget.
-        ...
 
     def set_switches_from_rule_nbr(self):
         """
