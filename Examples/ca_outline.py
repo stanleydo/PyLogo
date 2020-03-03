@@ -71,15 +71,15 @@ class CA_World(OnOffWorld):
         """
         absolute = SimEngine.gui_get('absolute')
         if SimEngine.gui_get('Random?'):
+            # Random sequence of 0's and 1's to fit the display size.
             line = [choice([0,1]) for _ in range(self.ca_display_size)]
         else:
             # A line of 0's.
-            padding = [0] * (self.ca_display_size)
+            padding = [0] * (self.ca_display_size-1)
             if SimEngine.gui_get('init') == '':
                 line = padding
             else:
                 line_0 = SimEngine.gui_get('init')
-                print(line_0)
                 # Convert line_0 to 0's and 1's
                 line = [1 if c == '1' else 0 for c in line_0]
                 # If the rule include 000 -> 1, fill out the new line with 0's.
@@ -88,10 +88,14 @@ class CA_World(OnOffWorld):
                     line_len = len(line)
                     actual_padding = padding[line_len:]
                     if absolute:
+                        # Pad to the left if we are absolute justifying to the right
+                        # Pad the right side if we are absolute justifying the left
+                        # Pad both sides if we are centering.
                         line = actual_padding + line if justification == 'Right' else \
                                line + actual_padding if justification == 'Left' else \
                                actual_padding + line + actual_padding #  justification == 'Center'
                     else:
+                        # We can add padding to both sides if we are not using absolute. (For all '000').
                         actual_padding = [0] * self.ca_display_size
                         line = actual_padding + line + actual_padding
         return line
@@ -129,7 +133,19 @@ class CA_World(OnOffWorld):
         cells are 0, delete them. If they are 1, insert a 0 cell at the corresponding
         end of each line in ca_lines
         """
-        ...
+        # Create a copy of the new line
+        nl_copy = new_line.copy()
+        # Check if the first and last elements are 0's
+        if (nl_copy[0], nl_copy[1]) == (0,0):
+            # Return a slice of the copied line without the first and last element
+            return nl_copy[1:-1]
+        # Check if the first and last elements are 1's
+        elif (nl_copy[0], nl_copy[1]) == (1,1):
+            # Return a list with 0's inserted to the front and end of the list.
+            return [0] + nl_copy + [0]
+
+        # No pairs of 0s or 1s at each end. No changes made.
+        return new_line
 
     @staticmethod
     def generate_new_line_from_current_line(prev_line):
@@ -156,10 +172,15 @@ class CA_World(OnOffWorld):
         # Concatenate 2 zeros to the beginning and end of the copy
         prev_copy = [0, 0] + prev_copy + [0, 0]
 
-        #
+        # Create a list for the new line
         new_line = []
+        # Loop through each number in the previous line
+        # Subtract 2 since we need to check the i'th, i+1, and i+2 indices and stay in bounds.
         for i in range(len(prev_copy)-2):
+            # Convert the first, next, and second next elements into strings to obtain the key
             neighbors = str(prev_copy[i]) + str(prev_copy[i+1]) + str(prev_copy[i+2])
+            # Get the value of the checkbox using the obtained key and convert it into an int.
+            # Append the converted integer onto the new line.
             new_line.append(int(SimEngine.gui_get(key=neighbors)))
         return new_line
 
@@ -269,7 +290,6 @@ class CA_World(OnOffWorld):
 
         # Use [0]*n to get a list of n 0s to use as left padding.
         left_padding = [0]*left_padding_needed
-        right_padding = []
 
         # Which elements of the ca_line are to be displayed?
         # More to the point, what is index of the first element of the line to be displayed?
@@ -302,41 +322,62 @@ class CA_World(OnOffWorld):
             # Center absolute displays everything in the center of the line.
             # Right absolute displays everything in the left half of the line.
             if absolute:
-                # Left -> Slice of everything on the left half
+                # Left -> Slice of everything on the right half
                 # Center -> Keep as is
-                # Right -> Slice of everything on the right half
+                # Right -> Slice of everything on the left half
                 ca_line_portion = ca_line[len(ca_line) // 2:] if justification == 'Left' \
                     else ca_line if justification == 'Center' \
                     else ca_line[:(len(ca_line) // 2) + 1]
 
+                # Number of padding to use, generated for each line portion
                 num_pad = display_width - len(ca_line_portion)
 
-                if justification == 'Left':
-                    right_padding = [0] * num_pad if len(ca_line_portion) < display_width else []
-
-                elif justification == 'Right':
+                if justification == 'Right':
                     if num_pad > 0:
+                        # Our line portion is not as large as the number of padding
+                        # Pad to fill in the additional space.
                         left_padding = [0] * num_pad
                     else:
+                        # Find the center of the line (since ca_line_portion is already halved)
+                        # len(ca_line_portion) just gives us the middle of ca_line
                         center_of_line = len(ca_line_portion)
+                        # Find where to begin our display
+                        # Since our ca_line can be very large, we need to use the center of the line
+                        # to calculate where we can begin our slice.
                         start_to_display = center_of_line - display_width
+                        # Since the length of our ca_line_portion is large enough,
+                        # We no longer need any padding, and can just slice right away.
                         ca_line_portion = ca_line[start_to_display:center_of_line]
                         left_padding = []
             else:
+                # Non-absolutes
+                # If we are left-justifying, we only care about the left side of the list
+                # If we are right-justifying, we only care about the right side of the list.
+                # Ca_line[::-1] is the reverse of Ca_line
                 ca_line_portion = ca_line[:display_width] if justification == 'Left' else \
                                   ca_line if justification == 'Center' else \
                                   ca_line[::-1][:display_width] if len(ca_line) > display_width and justification == 'Right' else \
                                   ca_line[::-1]
+                # We can pad the left side of the line with 0's based off the longest (last) line in the list
+                # Divide it by 2 and subtract the length of the current line by 2.
+                # This will pad 0s to fill up any difference in length.
                 left_padding = [0] * ((len(self.ca_lines[-1]) // 2) - (len(ca_line) // 2))
 
+            # We don't care about absolute or not here, since Center will be the same for both.
             if justification == 'Center':
+                # Now we have a different number for padding.
+                # Cut the display width in half and subtract the half the length of the portion.
                 num_pad = display_width // 2 - len(ca_line_portion) // 2
                 if num_pad > 0:
+                    # We only add padding based on half the length of the line
                     left_padding = [0] * num_pad
-                    right_padding = [0] * num_pad
                 else:
+                    # Once our left side fits the width of half the screen, we can just display a middle slice
+                    # that is the width of the display
                     center_of_line = len(ca_line_portion) // 2
+                    # Find where to begin and where to end in the slice (to get the middle)
                     start_to_display = center_of_line - display_width // 2
+                    # Set the portion to the center slice of the line
                     ca_line_portion = ca_line[start_to_display:center_of_line + (display_width // 2) + 1]
                     left_padding = []
 
@@ -348,22 +389,25 @@ class CA_World(OnOffWorld):
             # Put the three pieces together to get the full line.
             # Use chain() from itertools to combine the three parts of the line:
             #          left_padding, ca_line_portion, right_padding.
-
+            # We need this right padding in case we change justification mid-step
+            # It will clear up any previous 1's existing on the right side.
+            right_padding = [0] * (display_width - len(ca_line))
             padded_line = chain(left_padding, ca_line_portion, right_padding)
             # padded_line has the right number of 0's at the left. It then contains the elements from ca_line
             # to be displayed. If we need more elements to display, padded_line includes an unlimted number of
             # trailing 0's.
 
-            # Since padded_line will be dispalyed on patch_row, we can use zip again to pair up the values
+            # Since padded_line will be displayed on patch_row, we can use zip again to pair up the values
             # from padded_line with the Patches in patch_row. Since padded_line includes an unlimited number
             # of 0's at the end, zip will stop when it reaches the last Patch in patch_row.
 
-            ca_values_patchs = zip(padded_line, patch_row)
+            ca_values_patches = zip(padded_line, patch_row)
+            # Reverse the patch row if we're right justifying to make it easier when we are displaying.
             if justification == 'Right' and not absolute:
-                ca_values_patchs = zip(padded_line, reversed(patch_row))
+                ca_values_patches = zip(padded_line, reversed(patch_row))
 
             # Step through these value/patch pairs and put the values into the associated Patches.
-            for (ca_val, patch) in ca_values_patchs:
+            for (ca_val, patch) in ca_values_patches:
                 # Use the set_on_off method of OnOffPatch to set the patch to ca_val.
                 patch.set_on_off(ca_val)
 
@@ -459,14 +503,14 @@ class CA_World(OnOffWorld):
         # (b)
         # Extend lines in self.ca_lines at each end as needed. (Don't extend for extra 0's at the ends.)
         # Can't drop the 0's first because we then lose track of which end was extended.
-        new_line = self.drop_extraneous_0s_from_ends_of_new_line(new_line)
+        new_line = self.extend_ca_lines_if_needed(new_line)
 
         # (c)
-        trimmed_new_line = ... # Drop extraneous 0s at the end of new_line
+        trimmed_new_line = self.drop_extraneous_0s_from_ends_of_new_line(new_line)
         # Add trimmed_new_line to the end of self.ca_lines
-        self.ca_lines.append(new_line)
-        # (d)
+        self.ca_lines.append(trimmed_new_line)
 
+        # (d)
         # Refresh the display from self.ca_lines
         self.set_display_from_lines()
 
