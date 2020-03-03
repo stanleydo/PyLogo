@@ -69,25 +69,31 @@ class CA_World(OnOffWorld):
         However, if the rule includes 000 -> 1,pad the line with 0's on both ends to fill the display.
         How much to put on each end depends on the user-specific initial line and the requested justification.
         """
+        absolute = SimEngine.gui_get('absolute')
         if SimEngine.gui_get('Random?'):
-            line = ...
+            line = [choice([0,1]) for _ in range(self.ca_display_size)]
         else:
             # A line of 0's.
             padding = [0] * (self.ca_display_size)
-            if SimEngine.gui_get('init_line') == '':
+            if SimEngine.gui_get('init') == '':
                 line = padding
             else:
-                line_0 = SimEngine.gui_get('init_line')
+                line_0 = SimEngine.gui_get('init')
+                print(line_0)
                 # Convert line_0 to 0's and 1's
-                line = [... for c in line_0]
+                line = [1 if c == '1' else 0 for c in line_0]
                 # If the rule include 000 -> 1, fill out the new line with 0's.
                 if SimEngine.gui_get('000'):
                     justification = SimEngine.gui_get('justification')
                     line_len = len(line)
                     actual_padding = padding[line_len:]
-                    line = ... if justification == 'Right' else \
-                           ... if justification == 'Left' else \
-                           ... #  justification == 'Center'
+                    if absolute:
+                        line = actual_padding + line if justification == 'Right' else \
+                               line + actual_padding if justification == 'Left' else \
+                               actual_padding + line + actual_padding #  justification == 'Center'
+                    else:
+                        actual_padding = [0] * self.ca_display_size
+                        line = actual_padding + line + actual_padding
         return line
 
     @staticmethod
@@ -97,9 +103,25 @@ class CA_World(OnOffWorld):
         Return the result.
         Args:
             new_line: ca_state with perhaps extraneous 0 cells at the ends
-
         Returns: trimmed ca_state without extraneous 0 cells at the ends.
         """
+        # checks to see if the last element of new_line is 0
+        # if new_line[-1] == 0:
+        #     # removes ending 0 from new_line
+        #     new_line.pop(-1)
+        # # checks if first element of new_line is 0
+        # if new_line[0] == 0:
+        #     # removes first element of new_line
+        #     new_line.pop(0)
+
+        # checks to see if the first and last elements of new_line are both 0
+        if new_line[0] == 0 & new_line[-1] == 0:
+            # removes ending 0 from new_line
+            new_line.pop(-1)
+            # removes 0 from beginning of new_line
+            new_line.pop(0)
+
+        return new_line
 
     def extend_ca_lines_if_needed(self, new_line):
         """
@@ -231,7 +253,9 @@ class CA_World(OnOffWorld):
         This is the most difficult method. Here is the outline I used.
         """
         # Get the current setting of 'justification'.
-        init = SimEngine.gui_get('justification')
+        justification = SimEngine.gui_get('justification')
+        # Get the current setting of 'absolute'
+        absolute = SimEngine.gui_get('absolute')
 
         # Get the two relevant widths.
         display_width = gui.PATCH_COLS
@@ -241,15 +265,16 @@ class CA_World(OnOffWorld):
 
         # How many blanks must be prepended to the line to be displayed to fill the display row?
         # Will be 0 if the ca_line is at least as long as the display row or the line is left-justified.
-        left_padding_needed = 0 if ca_line_width >= display_width or init == 'Left' else display_width//2
+        left_padding_needed = 0 if ca_line_width >= display_width or justification == 'Left' else display_width//2
 
         # Use [0]*n to get a list of n 0s to use as left padding.
         left_padding = [0]*left_padding_needed
+        right_padding = []
 
         # Which elements of the ca_line are to be displayed?
         # More to the point, what is index of the first element of the line to be displayed?
         # Will be 0 if the display width is greater than or equal to the line width or we are left-justifying.
-        left_ca_line_index = 0 if display_width >= ca_line_width or init == 'Left' else 1
+        left_ca_line_index = 0 if display_width >= ca_line_width or justification == 'Left' else 1
 
         # Reverse self.ca_lines?
         ca_lines_to_display = reversed(self.ca_lines)
@@ -266,40 +291,57 @@ class CA_World(OnOffWorld):
         # elements of the shorter and pairs them with the initial elements of the longer.
 
         # We can now step through the corresponding pairs.
-        right_padding = []
         for (ca_line, patch_row) in ca_lines_patch_rows:
             # The values in ca_line are to be displayed on patch_row.
             # The issue now is how to align them.
 
             # Which elements of ca_line should be displayed?
             # We display the elements starting at left_ca_line_index (computed above).
-            # print("CA LINE: ", ca_line)
-            ca_line_portion = ca_line[int(len(ca_line)/2):] if init == 'Left' \
-                else ca_line if init == 'Center' \
-                else ca_line[:(len(ca_line)//2) + 1] if init == 'Right' else ca_line
 
-            if init == 'Left' and len(ca_line_portion) < ca_line_width:
-                right_padding = [0] * (ca_line_width-len(ca_line_portion))
+            # Left absolute justification displays the right half of the line.
+            # Center absolute displays everything in the center of the line.
+            # Right absolute displays everything in the left half of the line.
+            if absolute:
+                # Left -> Slice of everything on the left half
+                # Center -> Keep as is
+                # Right -> Slice of everything on the right half
+                ca_line_portion = ca_line[len(ca_line) // 2:] if justification == 'Left' \
+                    else ca_line if justification == 'Center' \
+                    else ca_line[:(len(ca_line) // 2) + 1]
+
+                num_pad = display_width - len(ca_line_portion)
+
+                if justification == 'Left':
+                    right_padding = [0] * num_pad if len(ca_line_portion) < display_width else []
+
+                elif justification == 'Right':
+                    if num_pad > 0:
+                        left_padding = [0] * num_pad
+                    else:
+                        center_of_line = len(ca_line_portion)
+                        start_to_display = center_of_line - display_width
+                        ca_line_portion = ca_line[start_to_display:center_of_line]
+                        left_padding = []
             else:
-                right_padding = []
+                ca_line_portion = ca_line[:display_width] if justification == 'Left' else \
+                                  ca_line if justification == 'Center' else \
+                                  ca_line[-display_width:] if len(ca_line) > display_width and justification == 'Right' else \
+                                  ca_line
 
-            num_pad_center = display_width // 2 - len(ca_line_portion) // 2
-            if init == 'Center' and num_pad_center > 0:
-                left_padding = [0] * num_pad_center
-            elif init == 'Center' and num_pad_center < 0:
-                center_of_line = len(ca_line_portion)//2
-                start_to_display = center_of_line - display_width // 2
-                ca_line_portion = ca_line[start_to_display:center_of_line + (display_width//2) + 1]
-                left_padding = []
-
-            num_pad_right = display_width - len(ca_line_portion)
-            if init == 'Right' and num_pad_right > 0:
-                left_padding = [0] * num_pad_right
-            elif init == 'Right' and num_pad_right < 0:
-                center_of_line = len(ca_line_portion)
-                start_to_display = center_of_line - display_width
-                ca_line_portion = ca_line[start_to_display:center_of_line]
-                left_padding = []
+                left_padding = [0] * ((len(self.ca_lines[-1])//2) - (len(ca_line)//2)) if justification == 'Left' else \
+                               [0] * (display_width - len(self.ca_lines[-1]) + (len(self.ca_lines[-1])//2) - (len(ca_line)//2)) if len(ca_line) < display_width else [0,0,0]
+                # right_padding = [0] * (len(ca_line))
+                # right_padding = []
+            if justification == 'Center':
+                num_pad = display_width // 2 - len(ca_line_portion) // 2
+                if num_pad > 0:
+                    left_padding = [0] * num_pad
+                    right_padding = [0] * num_pad
+                else:
+                    center_of_line = len(ca_line_portion) // 2
+                    start_to_display = center_of_line - display_width // 2
+                    ca_line_portion = ca_line[start_to_display:center_of_line + (display_width // 2) + 1]
+                    left_padding = []
 
             # For the complete display line and the desired justification,
             # we may need to pad ca_line_portion to the left or right (or both).
@@ -446,8 +488,11 @@ The following appears at the top-left of the window.
 # Rows shows the amount of rows that the program created with a key 'rows'
 # values and key in 'Inital Row' are sent to the method build_initial_line
 # key in Rows is sent to __init__
-ca_left_upper = [[sg.Text('Row justification'),
-                  sg.Combo(values=['Left', 'Center', 'Right'], key='justification', default_value='Right')],
+ca_left_upper = [[sg.CB('Absolute?', key='absolute', enable_events=True, default=True,
+                 tooltip="Sets the justification type to absolute")],
+
+                 [sg.Text('Row justification'),
+                 sg.Combo(values=['Left', 'Center', 'Right'], key='justification', default_value='Right')],
 
                  HOR_SEP(30),
 
