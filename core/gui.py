@@ -32,6 +32,27 @@ PATCH_ROWS = 51
 PATCH_COLS = 51
 
 
+# Since it's used as a default value, can't be a list. A tuple works just as well.
+SHAPES = {'netlogo_figure': ((1, 1), (0.5, 0), (0, 1), (0.5, 3/4)),
+          'square': ((1, 1), (1, 0), (0, 0), (0, 1)),
+          'star': ((1, 1), (0, 0), (0.5, 0.5), (0, 1), (1, 0), (0.5, 0.5), (0, 0.5), (1, 0.5), (0.5, 0.5),
+                   (0.5, 0), (0.5, 1), (0.5, 0.5)),
+          }
+
+
+def polygon(sides):
+    points = []
+    arc = 2*math.pi/sides
+    for i in range(sides):
+        angle = i*arc + math.pi/4
+        xy = (XY((math.cos(angle), math.sin(angle))) + XY((0.5, 0.5))).round(2)
+        points.append(xy)
+    # print(sides, points)
+    return points
+
+
+KNOWN_FIGURES = sorted(list(SHAPES.keys()) + ['circle', 'node'])
+
 
 def BLOCK_SPACING():
     return PATCH_SIZE + 1
@@ -65,6 +86,14 @@ FPS_VALUES = values = [1, 3, 6, 10, 15, 25, 40, 60]
 
 
 def gui_set(key, **kwargs):
+    """
+    Widgets typically have a 'disabled' property. The following makes
+    it possibleto use 'enabled' as the negation of 'disabled'.
+    """
+    if 'enabled' in kwargs:
+        value = kwargs.get('enabled')
+        kwargs['disabled'] = not bool(value)
+        kwargs.pop('enabled')
     widget = WINDOW[key]
     widget.update(**kwargs)
 
@@ -83,6 +112,7 @@ WINDOW: sg.PySimpleGUI.Window
 
 # The following are from pygame.
 SCREEN: Surface
+SCREEN_COLOR = 'gray19'  #sg.RGB(50, 60, 60))
 FONT: SysFont
 
 
@@ -91,7 +121,15 @@ def blit(image: Surface, rect: Union[Rect, Tuple]):
     gui.SCREEN.blit(image, rect)
 
 
-def draw_line(start_pixel, end_pixel, line_color: Color = Color('white'), width: int = 1):
+def draw(agent, shape_name):
+    if shape_name in ['circle', 'node']:
+        radius = round(BLOCK_SPACING()/2)*agent.scale if shape_name == 'circle' else 3
+        pg.draw.circle(gui.SCREEN, agent.color, agent.rect.center, int(radius), 0)
+    else:
+        print(f"Don't know how to draw a {shape_name}.")
+
+
+def draw_line(start_pixel, end_pixel, line_color: Color = Color('white'), width=1):
     line(gui.SCREEN, line_color, start_pixel, end_pixel, width)
 
 
@@ -116,8 +154,6 @@ class SimpleGUI:
         self.fps = 60
         self.idle_fps = 10
 
-        self.screen_color = pg.Color(sg.RGB(50, 60, 60))
-
         self.caption = caption
 
         self.screen_shape_width_height = (SCREEN_PIXEL_WIDTH(), SCREEN_PIXEL_HEIGHT())
@@ -131,8 +167,9 @@ class SimpleGUI:
         # All graphics are drawn to gui.SCREEN, which is a global variable.
         gui.SCREEN = pg.display.set_mode(self.screen_shape_width_height)
 
-    def fill_screen(self):
-        gui.SCREEN.fill(self.screen_color)
+    @staticmethod
+    def fill_screen():
+        gui.SCREEN.fill(pg.Color(gui.SCREEN_COLOR))
 
     def make_window(self, caption, gui_left_upper, gui_right_upper=None, bounce=True, fps=None):
         """

@@ -30,7 +30,7 @@ class XY(tuple):
         yy = self[1] + xy[1]
         return self.restore_type(xx, yy)
 
-    def __div__(self, scalar):
+    def __truediv__(self, scalar):
         return self * (1/scalar)
 
     def __mul__(self, scalar):
@@ -79,6 +79,10 @@ class Pixel_xy(XY):
 
     def __str__(self):
         return f'Pixel_xy{self.x, self.y}'
+
+    def closest_block(self, blocks, wrap=True):
+        closest = min(blocks, key=lambda block: self.distance_to(block.center_pixel.x, wrap))
+        return closest
 
     def distance_to(self, other, wrap):
         # Try all ways to get there including wrapping around.
@@ -160,7 +164,9 @@ class Velocity(XY):
     def __str__(self):
         return f'Velocity{self.dx, self.dy}'
 
-    # The @property decorator allows you to call the function without parentheses: v = Velocity(3, 4); v.dx -> 3
+    # The @property decorator allows you to call the function without parentheses:
+    # v = Velocity(3, 4)
+    # v.dx => 3
     @property
     def dx(self):
         return self.x
@@ -179,12 +185,14 @@ def center_pixel():
     return cp
 
 
-def heading_to_dxdy(heading) -> Velocity:
-    return _heading_to_dxdy_int(heading)
+def heading_and_speed_to_velocity(heading, speed) -> Velocity:
+    unit_dxdy = heading_to_unit_dxdy(heading)
+    velocity = unit_dxdy * speed
+    return velocity
 
 
 @lru_cache(maxsize=512)
-def _heading_to_dxdy_int(heading) -> Velocity:
+def heading_to_unit_dxdy(heading) -> Velocity:
     """ Convert a heading to a (dx, dy) pair as a unit velocity """
     angle = utils.heading_to_angle(heading)
     dx = utils.cos(angle)
