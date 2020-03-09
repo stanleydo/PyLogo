@@ -97,6 +97,11 @@ class NW_World(World):
         # Number of nodes we want to generate
         self.nb_nodes: int = None
 
+        # Dictionary that maps event keys to functions
+        self.events_and_functions = {'PreAtt': self.preferential_attachment,
+                                     'Ring': self.ring,
+                                     'Star': self.star}
+
         # Updates the world's values with defaults
         self.update()
 
@@ -116,52 +121,36 @@ class NW_World(World):
             # Creates agents and puts them in the World
             self.agent_class()
 
-    # Pref. Attachment, Ring, and Star will later be broken down into smaller parts.
-    # This is because they each use 80% of the same code.
-
-    def preferential_attachment(self):
-
-        # Clears the grid if the option is checked.
-        self.check_to_clear()
-
+    # Generates the number of agents specified and puts them in the world
+    # Returns a list of agents that have yet to undergo a link process (Pref Att, Ring, Star .. etc.)
+    def generate_and_get_new_agents(self):
         # Creates nodes based off the number of nodes and places them randomly on the grid
         # Randomly.. meaning a random direction and number of pixels from the center.
         self.generate_num_agents()
 
         # Since we don't want to touch any of the existing agents, we have to filter them out.
         agents_not_yet_linked = [agent for agent in World.agents if not agent.linked_once]
+
+        return agents_not_yet_linked
+
+    def preferential_attachment(self):
+        agents_not_yet_linked = self.generate_and_get_new_agents()
 
         # Make a preferential link for all the agents that we've just created.
         for agent in agents_not_yet_linked:
             agent.make_preferential_links(self.directed_link, agents_not_yet_linked)
 
     def ring(self):
+        agents_not_yet_linked = self.generate_and_get_new_agents()
 
-        # Clears the grid if the option is checked.
-        self.check_to_clear()
-
-        # Creates nodes based off the number of nodes and places them randomly on the grid
-        # Randomly.. meaning a random direction and number of pixels from the center.
-        self.generate_num_agents()
-
-        # Since we don't want to touch any of the existing agents, we have to filter them out.
-        agents_not_yet_linked = [agent for agent in World.agents if not agent.linked_once]
-
+        # Make ring links for all the agents that we've just created.
         for agent in agents_not_yet_linked:
             agent.make_ring_links(self.directed_link, agents_not_yet_linked)
 
     def star(self):
+        agents_not_yet_linked = self.generate_and_get_new_agents()
 
-        # Clears the grid if the option is checked.
-        self.check_to_clear()
-
-        # Creates nodes based off the number of nodes and places them randomly on the grid
-        # Randomly.. meaning a random direction and number of pixels from the center.
-        self.generate_num_agents()
-
-        # Since we don't want to touch any of the existing agents, we have to filter them out.
-        agents_not_yet_linked = [agent for agent in World.agents if not agent.linked_once]
-
+        # Make star links for all the agents that we've just created.
         for agent in agents_not_yet_linked:
             agent.make_star_links(self.directed_link, agents_not_yet_linked)
 
@@ -179,12 +168,10 @@ class NW_World(World):
         if event:
             self.update()
 
-        if event in 'PreAtt':
-            self.preferential_attachment()
-        elif event in 'Ring':
-            self.ring()
-        elif event in 'Star':
-            self.star()
+        if event in self.events_and_functions:
+            self.check_to_clear()
+            self.events_and_functions[event]()
+
 
     def setup(self):
 
@@ -201,6 +188,7 @@ class NW_World(World):
 
 import PySimpleGUI as sg
 
+# TODO -- Put the strings at the top?
 nw_left_upper =[
     # [sg.Button('Setup', key='Setup'), sg.Button('Go', key='Go'), sg.Button('Go Once', key='Step')],
 
