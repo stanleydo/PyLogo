@@ -318,7 +318,7 @@ force_left_upper = [
 
                     [sg.Text('Click "Setup and then "Go" for force computation.', pad=((0, 0), (0, 0)))],
                     [sg.Text('Nbr of nodes', pad=((0, 10), (20, 0))),
-                     sg.Slider((0, 20), default_value=7, orientation='horizontal', key='nbr_nodes',
+                     sg.Slider((0, 400), default_value=7, orientation='horizontal', key='nbr_nodes',
                                pad=((0, 0), (0, 0)), size=(15, 20),
                                tooltip='Nbr of agents created by setup')],
 
