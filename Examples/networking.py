@@ -13,9 +13,8 @@ import random
 class NW_Node(Agent):
 
     def __init__(self, **kwargs):
-        # Define a shape name. Usable shapes are found gui.SHAPES.
+        # Define a shape, which can be found in gui.KNOWN_FIGURES.
         # Some other examples are "netlogo_figure" (default), "square", and "star".
-        # TODO -- Add a GUI Element for selecting SHAPES, similar to "Force_and_effects.py"
         shape_name = SimEngine.gui_get('shape')
 
         # Initialize the super class to take advantage of methods and variables
