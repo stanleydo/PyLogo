@@ -67,10 +67,12 @@ class NW_Node(Agent):
         self.nbr_links = sum([1 if link.includes(self) else 0 for link in World.links])
 
     # TODO -- The first agent should link to the next agent, and the last agent should be linked to the first.
+    # Matthew - Work on this here.
     def make_ring_links(self, directed, agents_not_yet_linked):
         pass
 
     # TODO -- All agents should only be linked to the first.
+    # Wilson - Work on this here.
     def make_star_links(self, directed, agents_not_yet_linked):
         pass
 
