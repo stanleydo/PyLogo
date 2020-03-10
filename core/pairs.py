@@ -31,7 +31,8 @@ class XY(tuple):
         return self.restore_type(xx, yy)
 
     def __truediv__(self, scalar):
-        return self * (1/scalar)
+        return self.restore_type(float('inf'), float('inf')) if scalar == 0 else self * (1/scalar)
+
 
     def __mul__(self, scalar):
         xx = self.x * scalar
@@ -81,7 +82,7 @@ class Pixel_xy(XY):
         return f'Pixel_xy{self.x, self.y}'
 
     def closest_block(self, blocks, wrap=True):
-        closest = min(blocks, key=lambda block: self.distance_to(block.center_pixel.x, wrap))
+        closest = min(blocks, key=lambda block: self.distance_to(block.center_pixel, wrap))
         return closest
 
     def distance_to(self, other, wrap):
