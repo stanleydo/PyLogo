@@ -3,9 +3,8 @@ from __future__ import annotations
 from core.agent import Agent
 from core.gui import HOR_SEP, KNOWN_FIGURES
 from core.sim_engine import SimEngine
-from random import uniform
 from core.world_patch_block import World
-from core.link import Link, link_exists
+from core.link import Link
 
 import random
 
@@ -67,13 +66,37 @@ class NW_Node(Agent):
 
     # TODO -- The first agent should link to the next agent, and the last agent should be linked to the first.
     # Matthew - Work on this here.
-    def make_ring_links(self, directed, agents_not_yet_linked):
-        pass
+    def make_ring_links(self, directed, agents_not_yet_linked, next_agent_position):
+        # if self is not the last element of agents_not_yet_linked
+        # then it links self with the next element in agents_not_yet_linked
+        if next_agent_position < len(agents_not_yet_linked):
+            Link(self, agents_not_yet_linked[next_agent_position], directed)
+        # if self is the last element of agents_not_yet_linked
+        # then it links self with the first element in agents_not_yet_linked
+        else:
+            Link(self, agents_not_yet_linked[0], directed)
+        self.linked_once = True
 
     # TODO -- All agents should only be linked to the first.
     # Wilson - Work on this here.
     def make_star_links(self, directed, agents_not_yet_linked):
-        pass
+        # create links with the first element of agents_not_yet_linked being the star node
+        if self != agents_not_yet_linked[0]:
+            Link(self, agents_not_yet_linked[0], directed)
+        self.linked_once = True
+
+    def make_small_world_links(self, directed, agents_not_yet_linked, agent_position, nb_size, rewire_prob):
+        # every agent is linked to the next [nb_size] agents in agents_not_yet_linked
+        for i in range(agent_position + 1, agent_position + nb_size + 1):
+            # if i < the length of agents_not_yet_linked, then self can link to the agent at i
+            if i < len(agents_not_yet_linked):
+                Link(self, agents_not_yet_linked[i], directed)
+            # if i > the length of agents_not_yet_linked,
+            # then it wraps around to the beginning of agents_not_yet_linked
+            else:
+                Link(self, agents_not_yet_linked[i - len(agents_not_yet_linked)], directed)
+
+        self.linked_once = True
 
     # TODO -- Implementation of Spring Layout for Force-Directed-Graphing
     def apply_forces(self):
@@ -97,13 +120,19 @@ class NW_World(World):
         # Number of nodes we want to generate
         self.nb_nodes: int = None
 
-        # Dictionary that maps event keys to functions
-        self.events_and_functions = {'PreAtt': self.preferential_attachment,
-                                     'Ring': self.ring,
-                                     'Star': self.star}
+        # Small World Neighborhood-size and rewire probability
+        self.nb_size: int = None
+        self.rewire_probability: int = None
 
         # Updates the world's values with defaults
         self.update()
+
+        # Dictionary that maps event keys to functions
+        self.events_and_functions = {'PreAtt': self.preferential_attachment,
+                                     'Ring': self.ring,
+                                     'Star': self.star,
+                                     'SmallWorld': self.small_world,
+                                     'Lattice2D': self.lattice_2D}
 
     # Updates all of the values in self from their respective gui elements.
     def update(self):
@@ -111,6 +140,8 @@ class NW_World(World):
         self.layout = SimEngine.gui_get(key='Layout')
         self.clear_before_gen = bool(int(SimEngine.gui_get(key='clear')))
         self.nb_nodes = SimEngine.gui_get(key='nb-nodes')
+        self.nb_size = SimEngine.gui_get('nb-size')
+        self.rewire_probability = SimEngine.gui_get('rewire-prob')
 
     def check_to_clear(self):
         if self.clear_before_gen:
@@ -144,8 +175,10 @@ class NW_World(World):
         agents_not_yet_linked = self.generate_and_get_new_agents()
 
         # Make ring links for all the agents that we've just created.
+        next_agent_position = 1;
         for agent in agents_not_yet_linked:
-            agent.make_ring_links(self.directed_link, agents_not_yet_linked)
+            agent.make_ring_links(self.directed_link, agents_not_yet_linked, next_agent_position)
+            next_agent_position += 1
 
     def star(self):
         agents_not_yet_linked = self.generate_and_get_new_agents()
@@ -154,10 +187,34 @@ class NW_World(World):
         for agent in agents_not_yet_linked:
             agent.make_star_links(self.directed_link, agents_not_yet_linked)
 
-    def small_world(self):
-        ...
 
+    # TODO -- Small World implementation
+    # Watts and Strogatz's Model
+    # Start off with a regular network of N nodes and M neighbors per node (Need to have same pattern of connectivity)
+    # Use Beta (probability) * M links (neighbors)
+    # Rewire one end of the chosen links to another randomly chosen node
+    def small_world(self):
+
+        # Check if the Neighborhood size is less that half of the number of agents
+        if self.nb_nodes / 2 > self.nb_size:
+            agents_not_yet_linked = self.generate_and_get_new_agents()
+            # Make small world links for all the agents that we've just created.
+            agent_position = 0
+            for agent in agents_not_yet_linked:
+                agent.make_small_world_links(self.directed_link, agents_not_yet_linked, agent_position, self.nb_size,
+                                             self.rewire_probability)
+                agent_position += 1
+        else:
+            print("Neighborhood size must be less that half of nb-nodes")
+
+
+    def small_world_rewire(self, agents_not_yet_linked):
+        pass
+
+
+    # TODO -- Lattice 2D implementation
     def lattice_2D(self):
+
         ...
 
     def handle_event(self, event):
