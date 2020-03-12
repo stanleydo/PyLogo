@@ -10,12 +10,13 @@ from pygame import Surface
 import pygame.transform as pgt
 
 import core.gui as gui
-from core.gui import HALF_PATCH_SIZE, PATCH_SIZE
+from core.gui import HALF_PATCH_SIZE, PATCH_SIZE, SHAPES
 import core.pairs as pairs
-from core.pairs import Pixel_xy, RowCol, Velocity
+from core.pairs import heading_and_speed_to_velocity, Pixel_xy, RowCol, Velocity, XY
 import core.utils as utils
 from core.world_patch_block import Block, Patch, World
 
+import math
 from random import choice, randint
 from statistics import mean
 
@@ -27,7 +28,7 @@ def is_acceptable_color(rgb):
     """
     sum_rgb = sum(rgb)
     avg_rgb = sum_rgb/3
-    return sum_rgb >= 150 and sum(abs(avg_rgb-x) for x in rgb) > 100
+    return avg_rgb >= 160 and sum(abs(avg_rgb-x) for x in rgb) > 100
 
 
 # These are colors defined by pygame that satisfy is_acceptable_color() above.
@@ -38,9 +39,7 @@ NETLOGO_PRIMARY_COLORS = [(color_name, Color(color_name))
                           for color_name in ['gray', 'red', 'orange', 'brown', 'yellow', 'green', 'limegreen',
                                              'turquoise', 'cyan', 'skyblue3', 'blue', 'violet', 'magenta', 'pink']]
 
-# Since it's used as a default value, can't be a list. A tuple works just as well.
-# Only one shape defined so far.
-SHAPES = {'netlogo_figure': ((1, 1), (0.5, 0), (0, 1), (0.5, 3/4))}
+SQRT_2 = sqrt(2)
 
 
 class Agent(Block):
@@ -51,9 +50,9 @@ class Agent(Block):
 
     id = 0
 
-    SQRT_2 = sqrt(2)
+    # SQRT_2 = sqrt(2)
 
-    def __init__(self, center_pixel=None, color=None, scale=1.4, shape=SHAPES['netlogo_figure']):
+    def __init__(self, center_pixel=None, color=None, scale=1.4, shape_name='netlogo_figure'):
         # Can't make this a default value because pairs.CENTER_PIXEL() isn't defined
         # when the default values are compiled
         if center_pixel is None:
@@ -66,7 +65,8 @@ class Agent(Block):
         super().__init__(center_pixel, color)
 
         self.scale = scale
-        self.shape = shape
+
+        self.shape_name = shape_name
         self.base_image = self.create_base_image()
 
         self.id = Agent.id
@@ -74,9 +74,12 @@ class Agent(Block):
         self.label = None
         World.agents.add(self)
         self.current_patch().add_agent(self)
+
+        # Agents are created with a random heading and a velocity of 0.
+        # In NetLogo, agents do not have a speed attribute. They have a heading attribute.
+        # They are able to move by a given amount (forward(amount)) in the heading direction.
+        # After each forward() action, the agent is no longer moving. (But it retains its heading.)
         self.heading = randint(0, 359)
-        self.speed = 1
-        # To keep PyCharm happy.
         self.velocity = Velocity.velocity_00
 
     def __str__(self):
@@ -123,15 +126,17 @@ class Agent(Block):
     def create_base_image(self):
         base_image = self.create_blank_base_image()
 
-        # Instead of using pygame's smoothscale to scale the image, scale the polygon instead.
-        factor = self.scale*PATCH_SIZE
-        scaled_shape = [(v[0]*factor,  v[1]*factor) for v in self.shape]
-        pg.draw.polygon(base_image, self.color, scaled_shape)
+        factor = self.scale * PATCH_SIZE
+        if self.shape_name in SHAPES:
+            # Instead of using pygame's smoothscale to scale the image, scale the polygon instead.
+            scaled_shape = [(v[0]*factor,  v[1]*factor) for v in SHAPES[self.shape_name]]
+            pg.draw.polygon(base_image, self.color, scaled_shape, 0)
         return base_image
 
     def create_blank_base_image(self):
         # Give the agent a larger Surface (by sqrt(2)) to work with since it may rotate.
-        blank_base_image = Surface((self.rect.w * Agent.SQRT_2, self.rect.h * Agent.SQRT_2))
+        surface_size = XY((self.rect.width, self.rect.height))*SQRT_2
+        blank_base_image = Surface(surface_size)
         # This sets the rectangle to be transparent.
         # Otherwise it would be black and would cover nearby agents.
         # Even though it's a method of Surface, it can also take a Surface parameter.
@@ -151,20 +156,21 @@ class Agent(Block):
         dist = (self.center_pixel).distance_to(other.center_pixel, wrap)
         return dist
 
-    def draw(self):
-        self.image = pgt.rotate(self.base_image, -self.heading)
-        self.rect = self.image.get_rect(center=self.center_pixel)
-        super().draw()
-        
+    def draw(self, shape_name=None):
+        # No point in rotating circles or nodes. Only rotate SHAPES.
+        if self.shape_name in SHAPES:
+            self.image = pgt.rotate(self.base_image, -self.heading)
+            self.rect = self.image.get_rect(center=self.center_pixel)
+        super().draw(shape_name=self.shape_name)
+
     def face_xy(self, xy: Pixel_xy):
         new_heading = (self.center_pixel).heading_toward(xy)
         self.set_heading(new_heading)
 
-    def forward(self, speed=None):
-        if speed is None:
-            speed = self.speed
-        dxdy = pairs.heading_to_dxdy(self.heading) * speed
-        self.move_by_dxdy(dxdy)
+    def forward(self, speed=1):
+        velocity = heading_and_speed_to_velocity(self.heading, speed)
+        self.set_velocity(velocity)
+        self.move_by_velocity()
 
     def heading_toward(self, target):
         """ The heading required to face the target """
@@ -179,17 +185,16 @@ class Agent(Block):
         """
         Move to self.center_pixel + (dx, dy)
         """
-        if SimEngine.gui_get('Bounce?'):
-            new_dxdy = self.bounce_off_screen_edge(dxdy)
-            if dxdy is self.velocity:
-                self.set_velocity(new_dxdy)
-            dxdy = new_dxdy
         new_center_pixel_unwrapped = self.center_pixel + dxdy
         # Wrap around the grid of pixels.
         new_center_pixel_wrapped = new_center_pixel_unwrapped.wrap()
         self.move_to_xy(new_center_pixel_wrapped)
 
     def move_by_velocity(self):
+        if SimEngine.gui_get('Bounce?'):
+            new_velocity = self.bounce_off_screen_edge(self.velocity)
+            if self.velocity != new_velocity:
+                self.set_velocity(new_velocity)
         self.move_by_dxdy(self.velocity)
 
     def move_to_patch(self, patch):

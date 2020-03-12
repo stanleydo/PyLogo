@@ -6,6 +6,7 @@ from math import sqrt
 import numpy as np
 
 import core.gui as gui
+from core.gui import SHAPES
 from core.pairs import Pixel_xy, RowCol
 from core.utils import get_class_name
 
@@ -40,6 +41,7 @@ class Block(Sprite):
         self.image = Surface((self.rect.w, self.rect.h))
         self.color = self.base_color = color
         self.label = None
+        self.highlight = None
 
     def distance_to_xy(self, xy: Pixel_xy):
         x_dist = self.center_pixel.x - xy.x
@@ -48,19 +50,20 @@ class Block(Sprite):
         return dist
 
     # Note that the actual drawing (blit and draw_line) takes place in core.gui.
-    def draw(self):
+    def draw(self, shape_name=None):
         if self.label:
             self.draw_label()
-        gui.blit(self.image, self.rect)
+        if isinstance(self, Patch) or shape_name in SHAPES:
+            gui.blit(self.image, self.rect)
+        else:
+            gui.draw(self, shape_name=shape_name)
 
     def draw_label(self):
         text = gui.FONT.render(self.label, True, Color('black'), Color('white'))
         offset = Block.patch_text_offset if isinstance(self, Patch) else Block.agent_text_offset
         text_center = Pixel_xy((self.rect.x + offset, self.rect.y + offset))
-        # gui.SCREEN.blit(text, text_center)
         gui.blit(text, text_center)
         line_color = Color('white') if isinstance(self, Patch) and self.color == Color('black') else self.color
-        # self.draw_line(line_color=line_color, start_pixel=self.rect.center, end_pixel=text_center)
         gui.draw_line(start_pixel=self.rect.center, end_pixel=text_center, line_color=line_color)
 
     def set_color(self, color):
@@ -75,13 +78,14 @@ class Patch(Block):
         self.agents = None
         self._neighbors_4 = None
         self._neighbors_8 = None
+        self._neighbors_24 = None
 
     def __str__(self):
         class_name = get_class_name(self)
         return f'{class_name}{(self.row_col.row, self.row_col.col)}'
 
-    def add_agent(self, tur):
-        self.agents.add(tur)
+    def add_agent(self, agent):
+        self.agents.add(agent)
 
     @property
     def col(self):
@@ -104,9 +108,21 @@ class Patch(Block):
 
     def neighbors_8(self):
         if self._neighbors_8 is None:
-            all_deltas = ((-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (-1, 1), (1, -1), (1, 1))
-            self._neighbors_8 = self.neighbors(all_deltas)
+            eight_deltas = ((-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (-1, 1), (1, -1), (1, 1))
+            self._neighbors_8 = self.neighbors(eight_deltas)
         return self._neighbors_8
+
+    def neighbors_24(self):
+        if self._neighbors_24 is None:
+            twenty_four_deltas = ((-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (-1, 1), (1, -1), (1, 1),
+                                  (-2, -2), (-1, -2), (0, -2), (1, -2), (2, -2),
+                                  (-2, -1), (2, -1),
+                                  (-2, 0), (2, 0),
+                                  (-2, 1), (2, 1),
+                                  (-2, 2), (-1, 2), (0, 2), (1, 2), (2, 2),
+                                  )
+            self._neighbors_24 = self.neighbors(twenty_four_deltas)
+        return self._neighbors_24
 
     def neighbors(self, deltas):
         """
@@ -136,8 +152,8 @@ class World:
 
     def __init__(self, patch_class, agent_class):
 
-        self.event = None
-        self.values = None
+        # self.event = None
+        # self.values = None
 
         World.ticks = 0
 
@@ -145,8 +161,7 @@ class World:
         self.create_patches_array()
 
         self.agent_class = agent_class
-        World.agents = set()
-        World.links = set()
+        self.reset_all()
 
     @staticmethod
     def clear_all():
@@ -159,12 +174,18 @@ class World:
         for _ in range(nbr_agents):
             self.agent_class()
 
-    def create_ordered_agents(self, n):
-        """Create n Agents with headings evenly spaced from 0 to 360"""
-        for i in range(n):
-            agent = self.agent_class()
-            heading = i*360/n
+    def create_ordered_agents(self, n, shape_name='netlogo_figure', radius=140):
+        """
+        Create n Agents with headings evenly spaced from 0 to 360
+        Return a list of the Agents in the order created.
+        """
+        agent_list = [self.agent_class(shape_name=shape_name) for _ in range(n)]
+        for (i, agent) in enumerate(agent_list):
+            heading = i * 360 / n
             agent.set_heading(heading)
+            if radius:
+                agent.forward(radius)
+        return agent_list
 
     def create_patches_array(self):
         patch_pseudo_array = [[self.patch_class(RowCol((r, c))) for c in range(gui.PATCH_COLS)]
