@@ -14,7 +14,7 @@ from core.pairs import center_pixel, Pixel_xy, Velocity
 from core.sim_engine import SimEngine
 from core.utils import normalize_dxdy
 from core.world_patch_block import World
-
+import random
 
 class Network_Node(Agent):
 
@@ -27,8 +27,66 @@ class Network_Node(Agent):
         # Is the  node selected?
         self.selected = False
 
+        self.linked_once = False
+
+        self.nbr_links = 0
+
     def __str__(self):
         return f'FLN-{self.id}'
+
+    # TODO - Implement DIRECTED Links!
+    def make_preferential_links(self, agents_not_yet_linked):
+        directed = False
+        # How many links exist in the world?
+        # This number can not be <= 0, since we divide by it when finding probability.
+
+        possible_nodes = set(agents_not_yet_linked) - {self}
+
+        total_links = len(World.links) if World.links else 1
+
+        # Create two lists, one for Agents, and the second list with the corresponding Number of links
+        partners = []
+        partners_probability = []
+
+        # Update the number of links per agent
+        # Append the agent to the list of partners
+        # Append the number of links for that agent to partners_nbr_links
+        for agent in possible_nodes:
+            agent.update_nbr_links()
+            partners.append(agent)
+            # We divide number of links by total links to get a probability.
+            partners_probability.append(agent.nbr_links / total_links)
+
+        # Random.choices with k = 1 will pick 1 element from the population using the probability as our weight.
+        # Population and weights must be the same size, and there is a 1-1 mapping between both.
+        # This means population[0] will use weights[0] as the probability.
+        # This will return a list of k elements, which is why we have to get the index at 0.
+        preferred_agent = random.choices(population=partners, weights=partners_probability, k=1)[0]
+
+        # Create a link with the preferred agent
+        Link(self, preferred_agent, directed)
+        # Once this agent has found a link, it should not be selected as a possible node
+        # the next time preferential attachment is called in NW_World
+        self.linked_once = True
+
+    # Updates the agent's total number of links.
+    def update_nbr_links(self):
+        self.nbr_links = sum([1 if link.includes(self) else 0 for link in World.links])
+
+    # TODO - Implement DIRECTED Links!
+    def make_small_world_links(self, agents_not_yet_linked, agent_position, nb_size, rewire_prob):
+        directed = False
+        # every agent is linked to the next [nb_size] agents in agents_not_yet_linked
+        for i in range(agent_position + 1, agent_position + nb_size + 1):
+            # if i < the length of agents_not_yet_linked, then self can link to the agent at i
+            if i < len(agents_not_yet_linked):
+                Link(self, agents_not_yet_linked[i], directed)
+            # if i > the length of agents_not_yet_linked,
+            # then it wraps around to the beginning of agents_not_yet_linked
+            else:
+                Link(self, agents_not_yet_linked[i - len(agents_not_yet_linked)], directed)
+
+        self.linked_once = True
 
     def adjust_distances(self, velocity_adjustment):
         dist_unit = SimEngine.gui_get(('dist_unit'))
@@ -220,8 +278,45 @@ class Network_World(World):
             node.label = str(node.id) if show_labels else None
 
     @staticmethod
+    # TODO - Clean up the code a little so we don't have all the crazy if/else statements
     def generate_graph(graph_type, ring_node_list):
-        pass
+        if graph_type == 'pref attachment':
+            for agent in ring_node_list:
+                agent.make_preferential_links(ring_node_list)
+        elif graph_type in ['ring', 'star', 'wheel']:
+            first_node = ring_node_list[0]
+            node_a = first_node
+            if graph_type in ['star', 'wheel']:
+                # move the first node to the center
+                first_node.move_to_xy(center_pixel())
+            for node_b in ring_node_list if graph_type == 'random' else ring_node_list[1:]:
+                if graph_type in ['star']:
+                    # connects the center node to all other nodes
+                    Link(node_a, node_b)
+                elif graph_type in ['ring', 'wheel']:
+                    # in the case of ring, connects all the nodes in a ring formation
+                    # for wheel, it connects the nodes that are around the center node like ring
+                    Link(node_a, node_b)
+                    node_a = node_b
+
+            last_node = ring_node_list[-1]
+            if graph_type == 'ring':
+                # connects the last node to the first node closing the ring
+                Link(last_node, first_node)
+            elif graph_type == 'wheel':
+                # connects the last node to the first node closing the other part of the wheel
+                next_node = ring_node_list[1]
+                Link(last_node, next_node)
+                # creates the spokes of the wheel, like in star
+                for node in ring_node_list[2:]:
+                    Link(first_node, node)
+
+        # TODO - Convert Small World graph from networking.py to network_framework.
+        # Currently missing the required GUI elements for small_world
+        elif graph_type == 'small_world':
+            pass
+        else:
+            print("Neighborhood size must be less that half of nb-nodes")
 
     def handle_event(self, event):
         """

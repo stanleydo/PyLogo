@@ -13,9 +13,9 @@ class Network_Algorithms_World(Network_World):
     @staticmethod
     def generate_graph(graph_type, ring_node_list):
 
-        print("\n\nYour code goes here.")
-        pass
-
+        if graph_type == 'pref attachment':
+            for agent in ring_node_list:
+                agent.make_preferential_links(ring_node_list)
 
 if __name__ == '__main__':
     from core.agent import PyLogo

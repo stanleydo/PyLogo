@@ -3,8 +3,13 @@ from __future__ import annotations
 from core.agent import Agent
 from core.gui import HOR_SEP, KNOWN_FIGURES
 from core.sim_engine import SimEngine
+from core.utils import normalize_dxdy
 from core.world_patch_block import World
-from core.link import Link
+from core.link import Link, link_exists
+from core.pairs import center_pixel, Pixel_xy, Velocity
+from core.gui import BLOCK_SPACING, HOR_SEP, KNOWN_FIGURES, SCREEN_PIXEL_HEIGHT, SCREEN_PIXEL_WIDTH
+
+from math import sqrt
 
 import random
 
@@ -102,10 +107,80 @@ class NW_Node(Agent):
     def apply_forces(self):
         pass
 
+    def adjust_distances(self, velocity_adjustment):
+        dist_unit = 8
+        screen_distance_unit = sqrt(SCREEN_PIXEL_WIDTH()**2 + SCREEN_PIXEL_HEIGHT()**2)/dist_unit
+
+        repulsive_force: Velocity = Velocity((0, 0))
+
+        for agent in (World.agents - {self}):
+            repulsive_force += self.force_as_dxdy(self.center_pixel, agent.center_pixel, screen_distance_unit,
+                                                    repulsive=True)
+
+        # Also consider repulsive force from walls.
+        repulsive_wall_force: Velocity = Velocity((0, 0))
+
+        horizontal_walls = [Pixel_xy((0, 0)), Pixel_xy((SCREEN_PIXEL_WIDTH(), 0))]
+        x_pixel = Pixel_xy((self.center_pixel.x, 0))
+        for h_wall_pixel in horizontal_walls:
+            repulsive_wall_force += self.force_as_dxdy(x_pixel, h_wall_pixel, screen_distance_unit, repulsive=True)
+
+        vertical_walls = [Pixel_xy((0, 0)), Pixel_xy((0, SCREEN_PIXEL_HEIGHT()))]
+        y_pixel = Pixel_xy((0, self.center_pixel.y))
+        for v_wall_pixel in vertical_walls:
+            repulsive_wall_force += self.force_as_dxdy(y_pixel, v_wall_pixel, screen_distance_unit, repulsive=True)
+
+        attractive_force: Velocity = Velocity((0, 0))
+        for agent in (World.agents - {self}):
+            if link_exists(self, agent):
+                attractive_force += self.force_as_dxdy(self.center_pixel, agent.center_pixel, screen_distance_unit,
+                                                         repulsive=False)
+
+        net_force = repulsive_force + repulsive_wall_force + attractive_force
+        normalized_force: Velocity = net_force/max([net_force.x, net_force.y, velocity_adjustment])
+        normalized_force *= 10
+
+        if SimEngine.gui_get('Print force values'):
+            print(f'{self}. \n'
+                  f'rep-force {tuple(repulsive_force.round(2))}; \n'
+                  f'rep-wall-force {tuple(repulsive_wall_force.round(2))}; \n'
+                  f'att-force {tuple(attractive_force.round(2))}; \n'
+                  f'net-force {tuple(net_force.round(2))}; \n'
+                  f'normalized_force {tuple(normalized_force.round(2))}; \n\n'
+                  )
+
+        self.set_velocity(normalized_force)
+        self.forward()
+
+    @staticmethod
+    def force_as_dxdy(pixel_a: Pixel_xy, pixel_b: Pixel_xy, screen_distance_unit, repulsive):
+        """
+        Compute the force between pixel_a pixel and pixel_b and return it as a velocity: direction * force.
+        """
+        direction: Velocity = normalize_dxdy((pixel_a - pixel_b) if repulsive else (pixel_b - pixel_a))
+        d = pixel_a.distance_to(pixel_b, wrap=False)
+        if repulsive:
+            dist = max(1, pixel_a.distance_to(pixel_b, wrap=False) / screen_distance_unit)
+            rep_coefficient = 1
+            rep_exponent = -2
+            force = direction * (10 ** rep_coefficient) / 10 * dist ** rep_exponent
+            return force
+        else:  # attraction
+            dist = max(1, max(d, screen_distance_unit) / screen_distance_unit)
+            att_exponent = 2
+            force = direction * dist ** att_exponent
+            # If the link is too short, push away instead of attracting.
+            if d < screen_distance_unit:
+                force = force * (-1)
+            att_coefficient = 1
+            return 10 ** (att_coefficient - 1) * force
+
 class NW_World(World):
 
     def __init__(self, patch_class, agent_class):
         super().__init__(patch_class, agent_class)
+
+        self.velocity_adjustment = 1
 
         # True means the next generation of nodes will have directed links.
         self.directed_link: bool = None
@@ -238,8 +313,25 @@ class NW_World(World):
         self.update()
 
     def step(self):
-        # This method should move the agents to fit the layout
-        pass
+        for node in self.agents:
+            node.adjust_distances(self.velocity_adjustment)
+
+        # Set all the links back to normal.
+        for lnk in World.links:
+            lnk.color = lnk.default_color
+            lnk.width = 1
+
+        # self.selected_nodes = [node for node in self.agents if node.selected]
+        # # If there are exactly two selected nodes, find the shortest path between them.
+        # if len(self.selected_nodes) == 2:
+        #     self.shortest_path_links = self.shortest_path()
+        #     # self.shortest_path_links will be either a list of links or None
+        #     # If there is a path, highlight it.
+        #     if self.shortest_path_links:
+        #         for lnk in self.shortest_path_links:
+        #             lnk.color = Color('red')
+        #             lnk.width = 2
+
 
 
 
