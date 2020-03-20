@@ -3,22 +3,26 @@ from math import sqrt
 from random import choice, sample
 from typing import List, Tuple
 
+from core.agent import Agent
+
 from pygame.color import Color
 from pygame.draw import circle
 
 import core.gui as gui
 from core.agent import PYGAME_COLORS
-from core.graph_basics import Basic_Graph_Node, Basic_Graph_World
-from core.gui import (BLOCK_SPACING, CIRCLE, HOR_SEP, KNOWN_FIGURES, NETLOGO_FIGURE, SCREEN_PIXEL_HEIGHT,
-                      SCREEN_PIXEL_WIDTH, STAR)
+from core.gui import (BLOCK_SPACING,  HOR_SEP, KNOWN_FIGURES, SCREEN_PIXEL_HEIGHT,
+                      SCREEN_PIXEL_WIDTH)
 from core.link import Link, link_exists
 from core.pairs import Pixel_xy, Velocity, center_pixel
 from core.sim_engine import SimEngine
 from core.utils import normalize_dxdy
 from core.world_patch_block import World
 
+from core.gui import SHAPES
 
-class Graph_Node(Basic_Graph_Node):
+
+
+class Graph_Node(Agent):
 
     def __init__(self, **kwargs):
         if 'color' not in kwargs:
@@ -123,7 +127,7 @@ class Graph_Node(Basic_Graph_Node):
         return lns
 
 
-class Graph_World(Basic_Graph_World):
+class Graph_World(World):
 
     def __init__(self, patch_class, agent_class):
         self.velocity_adjustment = 1
@@ -390,6 +394,7 @@ RANDOM = 'random'
 RING = 'ring'
 SMALL_WORLD = 'small world'
 WHEEL = 'wheel'
+STAR = 'star'
 
 LINK_PROB = 'link_prob'
 CLUSTER_COEFF = 'cluster_coeff'
@@ -425,7 +430,7 @@ graph_left_upper = [
                     HOR_SEP(pad=((50, 0), (0, 0))),
 
                     [sg.Text(LAYOUT, pad=((0, 0), (20, 0))),
-                     sg.Combo([CIRCLE, FORCE_DIRECTED], key=LAYOUT, size=(11, 20),
+                     sg.Combo(['Circle', FORCE_DIRECTED], key=LAYOUT, size=(11, 20),
                                pad=((5, 0), (20, 0)), default_value=FORCE_DIRECTED, tooltip='Select a layout'),
 
                      sg.Text('Graph type', pad=((10, 0), (20, 0))),
@@ -517,7 +522,7 @@ graph_right_upper = [
 
                       sg.Col([
                               [sg.Text('Node shape'),
-                               sg.Combo(KNOWN_FIGURES, key=SHAPE, default_value=NETLOGO_FIGURE,
+                               sg.Combo(KNOWN_FIGURES, key=SHAPE, default_value='netlogo_figure',
                                         tooltip='Node shape')],
 
 

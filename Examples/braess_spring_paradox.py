@@ -4,9 +4,9 @@ from pygame.color import Color
 
 # Import the string constants you will need (mainly keys but also values such as the graph types)
 # as well as the classes and gui elements
-from Examples.network_framework import (DIST_UNIT, Graph_Node, NODE,
+from Examples.graph_framework import (DIST_UNIT, Graph_Node, NODE,
                                         network_left_upper, network_right_upper)
-from Examples.network_framework import Graph_World
+from Examples.graph_framework import Graph_World
 from core.gui import SCREEN_PIXEL_HEIGHT, SCREEN_PIXEL_WIDTH
 from core.link import Link
 from core.pairs import Pixel_xy

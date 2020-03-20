@@ -10,6 +10,8 @@ from pygame.font import SysFont
 from pygame.rect import Rect
 from pygame.surface import Surface
 
+import math
+
 # By importing this file itself, can avoid the use of globals
 # noinspection PyUnresolvedReferences
 import core.gui as gui
