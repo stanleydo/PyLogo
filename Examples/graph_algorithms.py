@@ -86,6 +86,7 @@ class Graph_Algorithms_World(Graph_World):
                         Link(agent, choice(linked_agents))
                     else:
                         Link(agent, choice(other_agents))
+        # TODO -- Need to implement the small world graph into this version (Move over from original networking.py)
 
 
 
