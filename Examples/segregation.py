@@ -1,11 +1,11 @@
 
-from core.agent import Agent, PYGAME_COLORS
-from core.sim_engine import SimEngine
-from core.world_patch_block import Patch, World
+from random import choice, randint, sample
 
 from pygame import Color
 
-from random import choice, randint, sample
+from core.agent import Agent, PYGAME_COLORS
+from core.sim_engine import SimEngine
+from core.world_patch_block import Patch, World
 
 
 class SegregationAgent(Agent):
@@ -200,4 +200,4 @@ gui_left_upper = [[sg.Text('density'),
 
 if __name__ == "__main__":
     from core.agent import PyLogo
-    PyLogo(SegregationWorld, "Schelling's segregation model", gui_left_upper, bounce=None)
+    PyLogo(SegregationWorld, "Schelling's segregation model", gui_left_upper, bounce=None, auto_setup=True)

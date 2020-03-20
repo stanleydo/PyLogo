@@ -1,24 +1,18 @@
 
 import os
+from typing import Tuple, Union
 
+import PySimpleGUI as sg
 import pygame as pg
 from pygame.color import Color
 from pygame.draw import line
 from pygame.font import SysFont
 from pygame.rect import Rect
-from pygame.sprite import Sprite
 from pygame.surface import Surface
 
 # By importing this file itself, can avoid the use of globals
 # noinspection PyUnresolvedReferences
 import core.gui as gui
-
-import PySimpleGUI as sg
-
-from typing import Optional, Tuple, Union
-
-import tkinter as tk
-
 
 # Assumes that all Blocks are square with side BLOCK_SIDE and one pixel between them.
 # PATCH_SIZE should be odd so that there is a center pixel: (HALF_PATCH_SIZE(), HALF_PATCH_SIZE()).
@@ -63,7 +57,7 @@ def HALF_PATCH_SIZE():
 
 
 
-def HOR_SEP(length=25, pad=((0, 0), (10, 10))):
+def HOR_SEP(length=25, pad=((0, 0), (0, 0))):
     return [sg.Text('_' * length, text_color='black', pad=pad)]
 
 
@@ -136,7 +130,7 @@ def draw_line(start_pixel, end_pixel, line_color: Color = Color('white'), width=
 class SimpleGUI:
 
     def __init__(self, gui_left_upper, gui_right_upper=None, caption="Basic Model",
-                 patch_size=15, board_rows_cols=(51, 51), bounce=None, fps=None):
+                 patch_size=15, board_rows_cols=(51, 51), clear=None, bounce=None, fps=None):
 
         gui.PATCH_SIZE = patch_size if patch_size % 2 == 1 else patch_size + 1
         gui.PATCH_ROWS = board_rows_cols[0] if board_rows_cols[0] % 2 == 1 else board_rows_cols[0] + 1
@@ -159,7 +153,8 @@ class SimpleGUI:
         self.screen_shape_width_height = (SCREEN_PIXEL_WIDTH(), SCREEN_PIXEL_HEIGHT())
 
         # All these gui.<variable> elements are globals in this file.
-        gui.WINDOW = self.make_window(caption, gui_left_upper, gui_right_upper=gui_right_upper, bounce=bounce, fps=fps)
+        gui.WINDOW = self.make_window(caption, gui_left_upper, gui_right_upper=gui_right_upper,
+                                      clear=clear, bounce=bounce, fps=fps)
 
         pg.init()
         gui.FONT = SysFont(None, int(1.5 * gui.BLOCK_SPACING()))
@@ -171,15 +166,20 @@ class SimpleGUI:
     def fill_screen():
         gui.SCREEN.fill(pg.Color(gui.SCREEN_COLOR))
 
-    def make_window(self, caption, gui_left_upper, gui_right_upper=None, bounce=True, fps=None):
+    def make_window(self, caption, gui_left_upper, gui_right_upper=None, clear=None, bounce=True, fps=None):
         """
         Create the window, including sg.Graph, the drawing surface.
         """
         # --------------------- PySimpleGUI window layout and creation --------------------
-        bounce_checkbox_line = ''
-        if bounce is not None:
-            bounce_checkbox_line = [sg.Checkbox('Bounce?', key='Bounce?', default=bounce,
-                                    tooltip='Bounce back from the edges of the screen?')]
+        clear_line = [] if clear is None else \
+                     [sg.Checkbox('Clear before setup?', key='Clear?', default=clear, pad=((0, 0), (10, 0)),
+                                  tooltip='Bounce back from the edges of the screen?')]
+
+        bounce_checkbox_line = [] if bounce is None else \
+                               [sg.Checkbox('Bounce?', key='Bounce?', default=bounce, pad=((20, 0), (10, 0)),
+                                            tooltip='Bounce back from the edges of the screen?')]
+
+        clear_line += bounce_checkbox_line
 
         fps_combo_line = ''
         if fps:
@@ -202,7 +202,7 @@ class SimpleGUI:
         col1 = [ *gui_left_upper,
                  gui.HOR_SEP(),
                  setup_go_line,
-                 bounce_checkbox_line,
+                 clear_line,
                  fps_combo_line,
                  gui.HOR_SEP(),
                  exit_button_line

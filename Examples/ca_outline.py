@@ -1,9 +1,14 @@
 
 from __future__ import annotations
 
+from itertools import chain
+from typing import List
+
+import numpy as np
+
 import core.gui as gui
 from core.gui import HOR_SEP
-from core.on_off import on_off_left_upper, OnOffPatch, OnOffWorld
+from core.on_off import OnOffPatch, OnOffWorld, on_off_left_upper
 from core.sim_engine import SimEngine
 from core.utils import bin_str
 
@@ -20,7 +25,7 @@ from typing import List
 
 class CA_World(OnOffWorld):
 
-    ca_display_size = 151
+    ca_display_size = 141
 
     # bin_0_to_7 is ['000' .. '111']
     bin_0_to_7 = [bin_str(n, 3) for n in range(8)]
@@ -107,6 +112,7 @@ class CA_World(OnOffWorld):
         Return the result.
         Args:
             new_line: ca_state with perhaps extraneous 0 cells at the ends
+
         Returns: trimmed ca_state without extraneous 0 cells at the ends.
         """
         # checks to see if the last element of new_line is 0
@@ -296,7 +302,7 @@ class CA_World(OnOffWorld):
         # Will be 0 if the display width is greater than or equal to the line width or we are left-justifying.
         left_ca_line_index = 0 if display_width >= ca_line_width or justification == 'Left' else 1
 
-        # Reverse self.ca_lines?
+        # Reverse both self.ca_lines and CA_World.patches_array.
         ca_lines_to_display = reversed(self.ca_lines)
         # Reverse the rows of CA_World.patches_array
         patch_rows_to_display_on = np.flip(CA_World.patches_array, axis=0)

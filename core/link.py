@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from pygame.color import Color
 
-from core.agent import Agent
 import core.gui as gui
+from core.agent import Agent
 from core.world_patch_block import World
 
 
@@ -20,13 +20,16 @@ def link_exists(agent_1, agent_2, directed=False):
     the same hash_object.
     """
     hash_obj = hash_object(agent_1, agent_2, directed)
-    return any(hash_obj == lnk.hash_object for lnk in World.links)
+    links = [lnk for lnk in World.links if lnk.hash_object == hash_obj]
+    return links[0] if links else None
 
 
 class Link:
 
     def __init__(self, agent_1: Agent, agent_2: Agent, directed: bool = False,
                  color: Color = Color('white'), width: int = 1):
+        if None in {agent_1, agent_2}:
+            raise Exception(f"Can't link to None: agent_1: {agent_1}, agent_2: {agent_2}.")
         self.agent_1: Agent = agent_1
         self.agent_2: Agent = agent_2
         self.both_sides = {agent_1, agent_2}
@@ -63,6 +66,13 @@ class Link:
 
     def is_linked_with(self, other, directed=False):
         return link_exists(self, other, directed)
+
+    def siblings(self):
+        """
+        Return: A tuple with the lnk_nbrs on each side, smaller side first
+        """
+        sibs = (self.agent_1.lnk_nbrs(), self.agent_2.lnk_nbrs())
+        return sibs if len(sibs[0]) < len(sibs[1]) else (sibs[1], sibs[0])
 
     def other_side(self, node):
         return (self.both_sides - {node}).pop()

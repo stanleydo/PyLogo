@@ -3,11 +3,11 @@
 # running. It's in that loop where the user clicks, setup, go, exit, etc.
 # The model loop runs the model. Once around that loop for each model tick.
 
-import core.gui as gui
-from core.gui import SimpleGUI
-
 import pygame as pg
 from pygame.time import Clock
+
+import core.gui as gui
+from core.gui import SimpleGUI
 
 
 class SimEngine:
@@ -16,7 +16,7 @@ class SimEngine:
     values = None
 
     def __init__(self, gui_left_upper, caption="Basic Model", gui_right_upper=None,
-                 patch_size=11, board_rows_cols=(51, 51), bounce=None, fps=None):
+                 patch_size=11, board_rows_cols=(51, 51), clear=None, bounce=None, fps=None):
 
         # Constants for the main loop in start() below.
         self.CTRL_D = 'D:68'
@@ -34,7 +34,8 @@ class SimEngine:
         self.world = None
 
         self.simple_gui = SimpleGUI(gui_left_upper, caption=caption, gui_right_upper=gui_right_upper,
-                                    patch_size=patch_size, board_rows_cols=board_rows_cols, bounce=bounce, fps=fps)
+                                    patch_size=patch_size, board_rows_cols=board_rows_cols,
+                                    clear=clear, bounce=bounce, fps=fps)
         self.graph_point = None
 
     def draw_world(self):
@@ -111,7 +112,7 @@ class SimEngine:
         else:
             gui.WINDOW.grab_any_where_off()
 
-    def top_loop(self, the_world):
+    def top_loop(self, the_world, auto_setup=False):
         self.world = the_world
         # Let events come through pygame to this level.
         pg.event.set_grab(False)
@@ -126,16 +127,18 @@ class SimEngine:
 
             self.set_grab_anywhere(self.gui_get('Grab'))
 
-            if SimEngine.event == '__TIMEOUT__':
+            if not auto_setup and SimEngine.event == '__TIMEOUT__':
                 continue
 
             if SimEngine.event == self.simple_gui.GRAPH:
                 self.world.mouse_click(SimEngine.values['-GRAPH-'])
 
-            elif SimEngine.event == self.simple_gui.SETUP:
+            elif auto_setup or SimEngine.event == self.simple_gui.SETUP:
+                auto_setup = False
                 SimEngine.gui_set(self.simple_gui.GOSTOP, disabled=False)
                 SimEngine.gui_set(self.simple_gui.GO_ONCE, disabled=False)
-                self.world.reset_all()
+                if SimEngine.gui_get('Clear?') in [True, None] :
+                    self.world.reset_all()
                 self.world.setup()
 
             elif SimEngine.event == self.simple_gui.GO_ONCE:
