@@ -13,10 +13,12 @@ from Examples.graph_framework import PREF_ATTACHMENT, RANDOM, RING, SMALL_WORLD,
 class Graph_Algorithms_World(Graph_World):
 
     # noinspection PyMethodMayBeStatic
+    # TODO -- Matthew work on this
     def average_path_length(self):
         return TBD
 
     # noinspection PyMethodMayBeStatic
+    # TODO -- Wilson work on this
     def clustering_coefficient(self):
         return TBD
 
