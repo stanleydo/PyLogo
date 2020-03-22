@@ -251,6 +251,7 @@ class Graph_World(World):
         # Update which buttons are enabled.
         self.disable_enable_buttons()
         super().draw()
+        thingy = Graph_World.agents
 
     @staticmethod
     def link_nodes_for_graph(graph_type, nbr_nodes, ring_node_list):
@@ -411,6 +412,7 @@ PRINT_FORCE_VALUES = 'Print force values'
 
 NBR_NODES = 'nbr_nodes'
 SHAPE = 'shape'
+NODE = 'node'
 COLOR = 'color'
 
 tt = 'Probability that two nodes in a random graph will be linked\n' \

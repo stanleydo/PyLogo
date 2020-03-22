@@ -353,7 +353,7 @@ nw_left_upper =[
     HOR_SEP(30, pad=(None, None)),
 
     [sg.Text('nb-nodes'),
-     sg.Slider(key='nb-nodes', range=(0, 100), default_value=15, orientation='horizontal')],
+     sg.Slider(key='nb-nodes', range=(0, 20), default_value=10, orientation='horizontal')],
 
     [sg.Button(button_text='PreAtt', key='PreAtt'),
      sg.Button(button_text='Ring', key='Ring'),

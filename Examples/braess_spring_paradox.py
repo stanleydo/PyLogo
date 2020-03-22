@@ -5,7 +5,7 @@ from pygame.color import Color
 # Import the string constants you will need (mainly keys but also values such as the graph types)
 # as well as the classes and gui elements
 from Examples.graph_framework import (DIST_UNIT, Graph_Node, NODE,
-                                        network_left_upper, network_right_upper)
+                                        graph_left_upper, graph_right_upper)
 from Examples.graph_framework import Graph_World
 from core.gui import SCREEN_PIXEL_HEIGHT, SCREEN_PIXEL_WIDTH
 from core.link import Link
@@ -104,5 +104,5 @@ class Braess_World(Graph_World):
 
 if __name__ == '__main__':
     from core.agent import PyLogo
-    PyLogo(Braess_World, 'Network test', gui_left_upper=network_left_upper,
-           gui_right_upper=network_right_upper, agent_class=Braess_Node, clear=False, auto_setup=True)
+    PyLogo(Braess_World, 'Network test', gui_left_upper=graph_left_upper,
+           gui_right_upper=graph_right_upper, agent_class=Braess_Node, clear=False, auto_setup=True)

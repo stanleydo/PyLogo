@@ -18,9 +18,77 @@ class Graph_Algorithms_World(Graph_World):
         return TBD
 
     # noinspection PyMethodMayBeStatic
-    # TODO -- Wilson work on this
     def clustering_coefficient(self):
-        return TBD
+        """
+        v = a node
+        kv = degree(number of nodes connected to v)
+        Nv: number of links between neighbors of v
+        cc = (2 * Nv) / (kv(kv-1))
+        """
+        all_nodes = list(Graph_World.agents)
+
+        # Top level Clustering Coefficient
+        cc_main = 0
+
+        # Loop through all of the nodes
+        for v in all_nodes:
+
+            # Find the degree of the node (kv), as well as a list of agents that are linked to v
+            kv, linked_nodes = self.find_linked_nodes(v)
+
+            # Check if there are actually any connected nodes to v before we do anything
+            if kv >= 2:
+                # Initialize nv (number of links between neighbors of v)
+                nv = 0
+                # We will use a while loop to pop off agents from linked_nodes
+                # This will allow us to search all nodes without adding
+                # the additional links from nv
+                while linked_nodes:
+                    print()
+                    print("linked nodes for ", v.id, " is ", [x.id for x in linked_nodes])
+                    neighbor_node = linked_nodes.pop(0)
+                    # Find the number of links that each neighbor has (Where the other agent is in Linked_nodes)
+                    # The 0th index is the nbr_links from (nbr_links, list_of_neighbors)
+                    # See self.find_linked_nodes() below
+                    nbr_links_neighbors = self.find_linked_nodes(neighbor_node, linked_nodes)[0]
+                    # Add the number of links between neighbors to nv
+                    nv += nbr_links_neighbors
+                # Compute cc(v) and add it to cc_main so we can average it later.
+                cc_sub_v = (2 * nv) / (kv * (kv - 1))
+                cc_main += cc_sub_v
+
+        # Average cc_main to find the clustering_coefficient of the whole graph
+        return cc_main / len(all_nodes)
+
+    @staticmethod
+    # The arrow "-> tuple" is a way to statically type functions in python
+    # This just means this method is supposed to return a tuple object.
+    def find_linked_nodes(node, agents_to_match=[]) -> tuple:
+        # Initialize a number of links and empty list of linked nodes
+        num_links = 0
+        linked_nodes = []
+
+        # Iterate through the links in the world
+        for link in Graph_World.links:
+            # Check if a link includes the node we want to check links for
+            if link.includes(node):
+                # Find the agent in the link that isn't the node we want to check links for
+                agent = link.agent_1 if link.agent_1 != node else link.agent_2
+
+                # This will to see if the agent matches an agent in the list
+                # If agents_to_match == [], Python will evaluate an empty list as False
+                if agents_to_match:
+                    if agent in agents_to_match:
+                        linked_nodes.append(agent)
+                        num_links += 1
+                else:
+                    # Update number of links and add this agent to the list of linked nodes
+                    linked_nodes.append(agent)
+                    num_links += 1
+
+        # Returns a tuple of (number of links, linked_node) for the corresponding node
+        # Or False if there are no links.
+        return num_links, linked_nodes
 
     def compute_metrics(self):
         cluster_coefficient = self.clustering_coefficient()
@@ -74,6 +142,7 @@ class Graph_Algorithms_World(Graph_World):
                 # creates the spokes of the wheel, like in star
                 for node in ring_node_list[2:]:
                     Link(first_node, node)
+        # PREFERENTIAL ATTACHMENT
         elif graph_type == PREF_ATTACHMENT:
             # Graph_Algorithms_World.links
             for agent in ring_node_list:
@@ -88,6 +157,8 @@ class Graph_Algorithms_World(Graph_World):
                         Link(agent, choice(linked_agents))
                     else:
                         Link(agent, choice(other_agents))
+        elif graph_type == SMALL_WORLD:
+            pass
         # TODO -- Need to implement the small world graph into this version (Move over from original networking.py)
 
 
