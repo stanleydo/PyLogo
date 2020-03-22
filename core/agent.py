@@ -48,8 +48,6 @@ class Agent(Block):
 
     id = 0
 
-    # SQRT_2 = sqrt(2)
-
     def __init__(self, center_pixel=None, color=None, scale=1.4, shape_name='netlogo_figure'):
         # Can't make this a default value because pairs.CENTER_PIXEL() isn't defined
         # when the default values are compiled
@@ -69,7 +67,7 @@ class Agent(Block):
 
         self.id = Agent.id
         Agent.id += 1
-        self.label = None
+        # self._label = None
         World.agents.add(self)
         self.current_patch().add_agent(self)
 
@@ -170,6 +168,9 @@ class Agent(Block):
         self.set_velocity(velocity)
         self.move_by_velocity()
 
+    # def get_center_pixel(self_xy) -> Pixel_xy:
+    #     return self.rect.center - Agent.half_patch_pixel).round()
+    #
     def heading_toward(self, target):
         """ The heading required to face the target """
         from_pixel = self.center_pixel
@@ -179,11 +180,19 @@ class Agent(Block):
     def in_links(self):
         return [lnk for lnk in World.links if lnk.directed and lnk.agent_2 is self]
 
+    def lnk_nbrs(self):
+        """
+        Return a list of links from this node and the nodes to which they attach.
+        """
+        lns = [(lnk, lnk.other_side(self)) for lnk in World.links if lnk.includes(self)]
+        return lns
+
     def move_by_dxdy(self, dxdy: Velocity):
         """
         Move to self.center_pixel + (dx, dy)
         """
-        new_center_pixel_unwrapped = self.center_pixel + dxdy
+        # noinspection PyTypeChecker
+        new_center_pixel_unwrapped: Pixel_xy = self.center_pixel + dxdy
         # Wrap around the grid of pixels.
         new_center_pixel_wrapped = new_center_pixel_unwrapped.wrap()
         self.move_to_xy(new_center_pixel_wrapped)
@@ -239,6 +248,16 @@ class Agent(Block):
     def undirected_links(self):
         return [lnk for lnk in self.all_links() if not lnk.directed]
 
+    @property
+    def x(self):
+        return self.center_pixel.x
+
+    @property
+    def y(self):
+        return self.center_pixel.y
+
+
+
 
 class Turtle(Agent):
     """ In case you want to call agents Turtles. """
@@ -250,7 +269,7 @@ from core.sim_engine import SimEngine
 
 
 def PyLogo(world_class=World, caption=None, gui_left_upper=None, gui_right_upper=None,
-           agent_class=Agent, patch_class=Patch, auto_setup=False,
+           agent_class=Agent, patch_class=Patch, auto_setup=True,
            patch_size=11, board_rows_cols=(51, 51), clear=None, bounce=None, fps=None):
     if gui_left_upper is None:
         gui_left_upper = []

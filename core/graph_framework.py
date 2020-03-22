@@ -3,17 +3,15 @@ from math import sqrt
 from random import choice, sample
 from typing import List, Tuple
 
-from core.agent import Agent
-
 from pygame.color import Color
 from pygame.draw import circle
 
 import core.gui as gui
-from core.agent import PYGAME_COLORS
-from core.gui import (BLOCK_SPACING,  HOR_SEP, KNOWN_FIGURES, SCREEN_PIXEL_HEIGHT,
-                      SCREEN_PIXEL_WIDTH)
+from core.agent import Agent, PYGAME_COLORS
+from core.gui import (BLOCK_SPACING, CIRCLE, HOR_SEP, KNOWN_FIGURES, NETLOGO_FIGURE, SCREEN_PIXEL_HEIGHT,
+                      SCREEN_PIXEL_WIDTH, STAR)
 from core.link import Link, link_exists
-from core.pairs import Pixel_xy, Velocity, center_pixel
+from core.pairs import Pixel_xy, Velocity
 from core.sim_engine import SimEngine
 from core.utils import normalize_dxdy
 from core.world_patch_block import World
@@ -251,7 +249,6 @@ class Graph_World(World):
         # Update which buttons are enabled.
         self.disable_enable_buttons()
         super().draw()
-        thingy = Graph_World.agents
 
     @staticmethod
     def link_nodes_for_graph(graph_type, nbr_nodes, ring_node_list):

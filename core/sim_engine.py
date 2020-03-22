@@ -114,6 +114,10 @@ class SimEngine:
 
     def top_loop(self, the_world, auto_setup=False):
         self.world = the_world
+        # self.world.reset_all()
+        self.draw_world()
+        if auto_setup:
+            gui.gui_set('setup', enabled=False)
         # Let events come through pygame to this level.
         pg.event.set_grab(False)
 

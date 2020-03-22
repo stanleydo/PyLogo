@@ -1,7 +1,6 @@
 # Import the string constants you need (mainly keys) as well as classes and gui elements
-from Examples.graph_framework import (CLUSTER_COEFF, Graph_Node, Graph_World, PATH_LENGTH, TBD, graph_left_upper,
-                                      graph_right_upper)
-from core.pairs import center_pixel
+from core.graph_framework import (CLUSTER_COEFF, Graph_Node, Graph_World, PATH_LENGTH, TBD, graph_left_upper,
+                                  graph_right_upper)
 from core.sim_engine import SimEngine
 from core.link import Link
 from random import choice
@@ -114,6 +113,7 @@ class Graph_Algorithms_World(Graph_World):
 
         Overrides this function from graph_framework.
         """
+        print("\n\nlink_nodes_for_graph: Your code goes here.")
         # RING, STAR, AND WHEEL
         if graph_type in [RING, STAR, WHEEL]:
             first_node = ring_node_list[0]
