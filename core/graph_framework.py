@@ -410,6 +410,9 @@ SHAPE = 'shape'
 NODE = 'node'
 COLOR = 'color'
 
+NBRH_SIZE = 'nbrh_size'
+sw_tt = 'Small World Neighborhood Size'
+
 tt = 'Probability that two nodes in a random graph will be linked\n' \
      'or that a link in a small world graph will be rewired'
 
@@ -439,7 +442,11 @@ graph_left_upper = [
                      sg.Slider((0, 100), default_value=10, orientation='horizontal', key=LINK_PROB,
                                size=(10, 20), pad=((0, 0), (10, 0)),
                                tooltip=tt)],
-
+                    [sg.Text('Neighborhood Size', pad=((0, 10), (20, 0)),
+                             tooltip=sw_tt),
+                     sg.Slider((0, 10), default_value=2, orientation='horizontal', key=NBRH_SIZE,
+                               size=(10, 20), pad=((0, 0), (10, 0)),
+                               tooltip=sw_tt)],
                     [sg.Text('Clustering coeff', pad=(None, (20, 0))),
                      sg.Text('None', background_color='white', text_color='black', key=CLUSTER_COEFF,
                              pad=((5, 0), (20, 0))),
