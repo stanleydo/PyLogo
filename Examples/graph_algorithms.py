@@ -1,12 +1,13 @@
 # Import the string constants you need (mainly keys) as well as classes and gui elements
 from core.graph_framework import (CLUSTER_COEFF, Graph_Node, Graph_World, PATH_LENGTH, TBD, graph_left_upper,
                                   graph_right_upper)
+from core.pairs import center_pixel
 from core.sim_engine import SimEngine
 from core.link import Link
 from random import choice
 
 # Import strings from graph_framework
-from Examples.graph_framework import PREF_ATTACHMENT, RANDOM, RING, SMALL_WORLD, WHEEL, STAR
+from core.graph_framework import PREF_ATTACHMENT, RANDOM, RING, SMALL_WORLD, WHEEL, STAR
 
 
 class Graph_Algorithms_World(Graph_World):
@@ -14,7 +15,20 @@ class Graph_Algorithms_World(Graph_World):
     # noinspection PyMethodMayBeStatic
     # TODO -- Matthew work on this
     def average_path_length(self):
-        return TBD
+        # a list of all the links in the world
+        all_links = self.links
+        # place holder variable for the summation of the lengths of all the links
+        total = 0
+        # adds the lengths of all the links together
+        for link in all_links:
+            total += link.agent_1.distance_to(link.agent_2)
+        # if there's at least one link, return the average length by dividing the summation of link lengths
+        # by the amount of links
+        # if there are no links return 0.0 to prevent a divide by 0 error
+        if len(all_links) > 0:
+            return total / len(all_links)
+        else:
+            return 0.0
 
     # noinspection PyMethodMayBeStatic
     def clustering_coefficient(self):

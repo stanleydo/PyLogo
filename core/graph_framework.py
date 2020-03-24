@@ -16,8 +16,6 @@ from core.sim_engine import SimEngine
 from core.utils import normalize_dxdy
 from core.world_patch_block import World
 
-from core.gui import SHAPES
-
 
 
 class Graph_Node(Agent):
