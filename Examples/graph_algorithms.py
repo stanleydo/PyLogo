@@ -1,10 +1,10 @@
 # Import the string constants you need (mainly keys) as well as classes and gui elements
 from core.graph_framework import (CLUSTER_COEFF, Graph_Node, Graph_World, PATH_LENGTH, TBD, graph_left_upper,
-                                  graph_right_upper)
+                                  graph_right_upper, LINK_PROB)
 from core.pairs import center_pixel
 from core.sim_engine import SimEngine
 from core.link import Link
-from random import choice
+from random import choice, sample
 
 # Import strings from graph_framework
 from core.graph_framework import PREF_ATTACHMENT, RANDOM, RING, SMALL_WORLD, WHEEL, STAR
@@ -156,6 +156,16 @@ class Graph_Algorithms_World(Graph_World):
                 # creates the spokes of the wheel, like in star
                 for node in ring_node_list[2:]:
                     Link(first_node, node)
+        elif graph_type == RANDOM:
+            link_prob = SimEngine.gui_get(LINK_PROB) / 100
+            for agent in ring_node_list:
+                if link_prob > 0:
+                    other_agents = [a for a in ring_node_list if a is not agent]
+                    # rand_agents generates a random sample list from other_agents
+                    # number of agents in rand_agents depends on link_prob
+                    rand_agents = sample(other_agents, int(len(other_agents) * link_prob))
+                    for i in range(len(rand_agents)):
+                        Link(agent, rand_agents[i])
         # PREFERENTIAL ATTACHMENT
         elif graph_type == PREF_ATTACHMENT:
             # Graph_Algorithms_World.links
@@ -172,7 +182,22 @@ class Graph_Algorithms_World(Graph_World):
                     else:
                         Link(agent, choice(other_agents))
         elif graph_type == SMALL_WORLD:
-            pass
+            # gets neighborhood size from GUI
+            neighborhood_size = SimEngine.gui_get("nbrh_size")
+            # if the neighborhood size is not less than half of the number of nodes,
+            # then there will be overlap in the links, a links to b and b links to a
+            # this if statement prevents that
+            if neighborhood_size >= len(ring_node_list) / 2:
+                neighborhood_size = int(len(ring_node_list) / 2) - 1 + (len(ring_node_list) % 2)
+            # nested for loop that loops through the [neighborhood size] next nodes after node_a
+            # for all node_a in ring_node_list
+            for node_num_a in range(len(ring_node_list)):
+                for node_num_b in range(node_num_a + 1, node_num_a + 1 + neighborhood_size):
+                    # loops back around if node_num_b goes past the end of ring_node_list
+                    if node_num_b >= len(ring_node_list):
+                        node_num_b = node_num_b - len(ring_node_list)
+                    # links node_a to node_b
+                    Link(ring_node_list[node_num_a], ring_node_list[node_num_b])
         # TODO -- Need to implement the small world graph into this version (Move over from original networking.py)
 
 
