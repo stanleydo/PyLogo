@@ -97,9 +97,9 @@ class Graph_Node(Agent):
         Compute the force between pixel_a pixel and pixel_b and return it as a velocity: direction * force.
         """
         direction: Velocity = normalize_dxdy( (pixel_a - pixel_b) if repulsive else (pixel_b - pixel_a) )
-        d = max(1, pixel_a.distance_to(pixel_b, wrap=False))
+        d = max(1, pixel_a.distance_to(pixel_b))
         if repulsive:
-            dist = max(1, pixel_a.distance_to(pixel_b, wrap=False) / screen_distance_unit)
+            dist = max(1, pixel_a.distance_to(pixel_b) / screen_distance_unit)
             rep_coefficient = SimEngine.gui_get(REP_COEFF)
             rep_exponent = SimEngine.gui_get(REP_EXPONENT)
             force = direction * ((10**rep_coefficient)/10) * dist**rep_exponent
@@ -435,7 +435,7 @@ graph_left_upper = [
 
                      sg.Text('Graph type', pad=((10, 0), (20, 0))),
                      sg.Combo([PREF_ATTACHMENT, RANDOM, RING, SMALL_WORLD, STAR, WHEEL], size=(11, 20),
-                              key=GRAPH_TYPE, pad=((5, 0), (20, 0)), default_value=WHEEL, tooltip='graph type')],
+                              key=GRAPH_TYPE, pad=((5, 0), (20, 0)), default_value=PREF_ATTACHMENT, tooltip='graph type')],
 
                     [sg.Text('Random graph link prob\nSmall world rewire prob', pad=((0, 10), (20, 0)),
                              tooltip=tt),

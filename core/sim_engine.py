@@ -7,7 +7,6 @@ import pygame as pg
 from pygame.time import Clock
 
 import core.gui as gui
-from core.gui import SimpleGUI
 
 
 class SimEngine:
@@ -33,7 +32,7 @@ class SimEngine:
 
         self.world = None
 
-        self.simple_gui = SimpleGUI(gui_left_upper, caption=caption, gui_right_upper=gui_right_upper,
+        self.simple_gui = gui.SimpleGUI(gui_left_upper, caption=caption, gui_right_upper=gui_right_upper,
                                     patch_size=patch_size, board_rows_cols=board_rows_cols,
                                     clear=clear, bounce=bounce, fps=fps)
         self.graph_point = None
