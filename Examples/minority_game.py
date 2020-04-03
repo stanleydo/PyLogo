@@ -235,10 +235,12 @@ class Minority_Game_World(World):
     def setup(self):
         Agent.id = 0
         Minority_Game_World.steps_to_win = SimEngine.gui_get(STEPS_TO_WIN)
+
         # Adjust how far one step is based on number of steps needed to win
         Minority_Game_World.one_step = (gui.PATCH_COLS - 2) * gui.BLOCK_SPACING() / Minority_Game_World.steps_to_win
+
         # For longer/shorter races, speed up/slow down frames/second
-        gui.set_fps(round(6*Minority_Game_World.steps_to_win/50))
+        SimEngine.fps = round(6*Minority_Game_World.steps_to_win/50)
 
         # self.done will be True if this a repeat game with the same agents.
         if self.done:
@@ -250,7 +252,6 @@ class Minority_Game_World(World):
         if Minority_Game_World.nbr_agents % 2 == 0:
             Minority_Game_World.nbr_agents += (1 if Minority_Game_World.nbr_agents < gui.WINDOW[NBR_AGENTS].Range[1]
                                                else (-1))
-            # gui.WINDOW[NBR_AGENTS].update(value=Minority_Game_World.nbr_agents)
             SimEngine.gui_set(NBR_AGENTS, value=Minority_Game_World.nbr_agents)
         Minority_Game_World.random_agent_ids = {0, Minority_Game_World.nbr_agents - 1}
 
