@@ -16,41 +16,41 @@ class Graph_Algorithms_World(Graph_World):
 
     # noinspection PyMethodMayBeStatic
     # Matthew's implementation of average_path_length
-    # def average_path_length(self):
-    #     # a list of all the links in the world
-    #     all_links = self.links
-    #     # place holder variable for the summation of the lengths of all the links
-    #     total = 0
-    #     # adds the lengths of all the links together
-    #     for link in all_links:
-    #         total += link.agent_1.distance_to(link.agent_2)
-    #     # if there's at least one link, return the average length by dividing the summation of link lengths
-    #     # by the amount of links
-    #     # if there are no links return 0.0 to prevent a divide by 0 error
-    #     if len(all_links) > 0:
-    #         return total / len(all_links)
-    #     else:
-    #         return 0.0
-
     def average_path_length(self):
-        all_paths = self.all_pairs_shortest_path()
-        nbr_links = len(Graph_World.links)
-        nbr_agents = len(Graph_World.agents)
-        avg_shortest_path = 0.0
+        # a list of all the links in the world
+        all_links = self.links
+        # place holder variable for the summation of the lengths of all the links
+        total = 0
+        # adds the lengths of all the links together
+        for link in all_links:
+            total += link.agent_1.distance_to(link.agent_2)
+        # if there's at least one link, return the average length by dividing the summation of link lengths
+        # by the amount of links
+        # if there are no links return 0.0 to prevent a divide by 0 error
+        if len(all_links) > 0:
+            return total / len(all_links)
+        else:
+            return 0.0
 
-        for col in range(nbr_agents):
-            avg_path = 0.0
-            non_paths = 0
-            for row in all_paths:
-                if row[col] != 0 and row[col] != 99999.0:
-                    avg_path += row[col]
-                else:
-                    non_paths += 1
-
-            avg_path = avg_path / nbr_agents-1-non_paths
-            avg_shortest_path += avg_path
-
-        return avg_shortest_path/nbr_agents
+    # def average_path_length(self):
+    #     all_paths = self.all_pairs_shortest_path()
+    #     nbr_links = len(Graph_World.links)
+    #     nbr_agents = len(Graph_World.agents)
+    #     avg_shortest_path = 0.0
+    #
+    #     for col in range(nbr_agents):
+    #         avg_path = 0.0
+    #         non_paths = 0
+    #         for row in all_paths:
+    #             if row[col] != 0 and row[col] != 99999.0:
+    #                 avg_path += row[col]
+    #             else:
+    #                 non_paths += 1
+    #
+    #         avg_path = avg_path / nbr_agents-1-non_paths
+    #         avg_shortest_path += avg_path
+    #
+    #     return avg_shortest_path/nbr_agents
 
 
     # Wilson & Stanley's implementation of Clustering-Coefficent
@@ -131,7 +131,7 @@ class Graph_Algorithms_World(Graph_World):
         avg_path_length = self.average_path_length()
         SimEngine.gui_set(PATH_LENGTH, value=avg_path_length)
 
-        self.print_floyds_algorithm()
+        # self.print_floyds_algorithm()
 
     def print_floyds_algorithm(self):
         print()
@@ -256,49 +256,49 @@ class Graph_Algorithms_World(Graph_World):
         elif graph_type == PREF_ATTACHMENT:
 
             # Implementation of Preferential Attachment based solely off number of links per agent.
-            # for agent in ring_node_list:
-            #     other_agents = [a for a in ring_node_list if a is not agent]
-            #     linked_agent_pairs = [(l.agent_1, l.agent_2) for l in Graph_Algorithms_World.links if
-            #                           not l.includes(agent)]
-            #     linked_agents = [a for pair in linked_agent_pairs for a in pair]
-            #     if not Graph_Algorithms_World.links:
-            #         Link(agent, choice(other_agents))
-            #     else:
-            #         if linked_agents:
-            #             Link(agent, choice(linked_agents))
-            #         else:
-            #             Link(agent, choice(other_agents))
+            for agent in ring_node_list:
+                other_agents = [a for a in ring_node_list if a is not agent]
+                linked_agent_pairs = [(l.agent_1, l.agent_2) for l in Graph_Algorithms_World.links if
+                                      not l.includes(agent)]
+                linked_agents = [a for pair in linked_agent_pairs for a in pair]
+                if not Graph_Algorithms_World.links:
+                    Link(agent, choice(other_agents))
+                else:
+                    if linked_agents:
+                        Link(agent, choice(linked_agents))
+                    else:
+                        Link(agent, choice(other_agents))
 
             # Another implementation of Preferential Attachment using choices
-            for agent in ring_node_list:
-                # All the nodes that have yet to get a link, minus this agent
-                # The agent theoretically should have been just created when this method is called.
-                other_agents = [a for a in ring_node_list if a is not agent]
-
-                # How many links exist in the world?
-                # This number can not be <= 0, since we divide by it when finding probability.
-                total_links = len(Graph_World.links) if Graph_World.links else 1
-
-                partners = []
-                partners_probability = []
-
-                for a in other_agents:
-                    nbr_links = 0
-                    for link in Graph_World.links:
-                        if link.includes(a):
-                            nbr_links += 1
-                    partners.append(a)
-                    # We divide number of links by total links to get a probability.
-                    partners_probability.append(nbr_links/total_links)
-
-                # Random.choices with k = 1 will pick 1 element from the population using the probability as our weight.
-                # Population and weights must be the same size, and there is a 1-1 mapping between both.
-                # This means population[0] will use weights[0] as the probability.
-                # This will return a list of k elements, which is why we have to get the index at 0.
-                preferred_agent = choices(population=partners, weights=partners_probability, k=1)[0]
-
-                # Create a link with the preferred agent
-                Link(agent, preferred_agent)
+            # for agent in ring_node_list:
+            #     # All the nodes that have yet to get a link, minus this agent
+            #     # The agent theoretically should have been just created when this method is called.
+            #     other_agents = [a for a in ring_node_list if a is not agent]
+            #
+            #     # How many links exist in the world?
+            #     # This number can not be <= 0, since we divide by it when finding probability.
+            #     total_links = len(Graph_World.links) if Graph_World.links else 1
+            #
+            #     partners = []
+            #     partners_probability = []
+            #
+            #     for a in other_agents:
+            #         nbr_links = 0
+            #         for link in Graph_World.links:
+            #             if link.includes(a):
+            #                 nbr_links += 1
+            #         partners.append(a)
+            #         # We divide number of links by total links to get a probability.
+            #         partners_probability.append(nbr_links/total_links)
+            #
+            #     # Random.choices with k = 1 will pick 1 element from the population using the probability as our weight.
+            #     # Population and weights must be the same size, and there is a 1-1 mapping between both.
+            #     # This means population[0] will use weights[0] as the probability.
+            #     # This will return a list of k elements, which is why we have to get the index at 0.
+            #     preferred_agent = choices(population=partners, weights=partners_probability, k=1)[0]
+            #
+            #     # Create a link with the preferred agent
+            #     Link(agent, preferred_agent)
 
         # Matthew's implementation of Small-World Graph
         elif graph_type == SMALL_WORLD:

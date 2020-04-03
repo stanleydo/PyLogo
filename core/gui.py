@@ -19,7 +19,7 @@ import core.gui as gui
 # PATCH_SIZE should be odd so that there is a center pixel: (HALF_PATCH_SIZE(), HALF_PATCH_SIZE()).
 # Assumes that the upper left corner is at (relative) (0, 0).
 # If PATCH_SIZE == 3, then HALF_PATCH_SIZE() == 3//2 == 1, and center pixel == (1, 1)
-from core.pairs import XY
+# from core.pairs import XY
 
 PATCH_SIZE = 11
 
