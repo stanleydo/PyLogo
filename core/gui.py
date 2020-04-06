@@ -79,14 +79,14 @@ def SCREEN_PIXEL_WIDTH():
     """
     Includes pixel x coordinates range(SCREEN_PIXEL_WIDTH())
     """
-    return PATCH_COLS * BLOCK_SPACING() + 1
+    return PATCH_COLS * BLOCK_SPACING()
 
 
 def SCREEN_PIXEL_HEIGHT():
     """
     Includes pixel y coordinates range(SCREEN_PIXEL_HEIGHT())
     """
-    return PATCH_ROWS * BLOCK_SPACING() + 1
+    return PATCH_ROWS * BLOCK_SPACING()
 
 
 FPS_VALUES = values = [1, 3, 6, 10, 15, 25, 40, 60]
