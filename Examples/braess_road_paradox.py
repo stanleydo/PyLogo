@@ -3,9 +3,17 @@
 from pygame import color
 from core.agent import Agent
 from core.pairs import center_pixel, RowCol
+from core.sim_engine import SimEngine
 from core.world_patch_block import World, Patch
 from pygame.color import Color
 from core.gui import PATCH_ROWS, PATCH_COLS
+
+# TODO -- Testing:
+# Test spawn-commuters rate and make sure we have constants good enough for the tickrate
+# Spawn a commuter from a patch and test moving in specified directions
+# Test World.reset_all() and setup so that we do not have anything unaccounted for
+# Constantly check our numbers for smoothing and averages for NetLogo-like results
+# Test what happens when there are multiple turtles on one patch
 
 # We specify our own subclass of Agent, so we can add some additional properties.
 class Commuter(Agent):
@@ -17,9 +25,38 @@ class Commuter(Agent):
         self.route = None
 
     def move(self):
-        pass
+        # We can use self.current_patch() to get the patch this agent is on.
+        my_patch = self.current_patch()
+
+        # If I've been here long enough, set the patch's last_here to the World's ticks and move 1 unit
+        if self.ticks_here > my_patch.delay:
+            my_patch.last_here = World.ticks
+            # Move commuter to next patch (in direction its facing)
+            # Can be implemented by facing_xy and moving it 1 unit in that direction.
+            #Re-set ticks_here to 1
+        else:
+            self.ticks_here += 1
+
+        # if I reach the top-right and my route is 0, face the bottom right
+        # if I reach the top-right and my route is 2, face the bottom left
+        # if I reach the bottom left, face the bottom right
+        # if I reach the bottom right, i end my commute.
+
+    def new_route(self):
+        # new-route
+        # in an if-else statement, check the mode selected from the interface
+        # go to the associated method
+        m = SimEngine.gui_get('mode')
+        if m == emp_analytical:
+            World.emp_analytical()
+        if m == best_known_w_ran_dev:
+            World.best_known_w_ran_dev()
+        if m == probabilistic_greedy:
+            World.probabilistic_greedy()
 
     def end_commute(self):
+        # Reports the average travel time.
+        # Also reports top, bottom, and middle travel times of the last commuter to end.
         World.travel_time = (World.ticks - self.birth_tick) / 450
         World.avg = World.travel_time if World.avg == 0 else ((19 * World.avg + World.travel_time) / 20)
         if self.route == 0:
@@ -28,6 +65,8 @@ class Commuter(Agent):
         if self.route == 1:
             World.bottom = World.travel_time if World.bottom == 0 else ((World.travel_time)+ \
                                                                         ((World.smoothing - 1) * World.bottom)) / World.smoothing
+        # Calculate and set World.middle
+        self.kill()
 
 # We specify our own subclass of Patch, so we can add some additional properties.
 class Braess_Patch(Patch):
@@ -39,13 +78,12 @@ class Braess_Patch(Patch):
         self.road_type = None
         self.last_here = None
 
-    def reset(self):
-        self.delay = None
-        self.base_delay = None
-        self.road_type = None
-        self.last_here = None
-
     def determine_congestion(self):
+        # procedure for dynamic patches
+        # if patch last_here is nothing, we can go fast and set delay to base_delay / 2
+        # else we set the delay to be (((250 / spawn-rate)/(World.ticks - last_here + 1)) * base_delay)
+        # Then we set the patch color to be more red or yellow (255 G 0) depending on the calculation:
+        # 255 + floor (255 * (0.5 - (delay / base-delay))) by adding more or less green
         pass
 
 # We specify our own subclass of World, so we can add some additional properties.
@@ -65,14 +103,14 @@ class Braess_World(World):
         self.bottom_prob = None
         self.middle_prob = None
 
-        # I might move this into Setup Roads.
         # Define the corner patches.
-        self.top_left: Patch = World.patches_array[2][2]
-        self.top_right: Patch = World.patches_array[2][PATCH_COLS-3]
-        self.bottom_right: Patch = World.patches_array[PATCH_ROWS - 3][PATCH_COLS - 3]
-        self.bottom_left: Patch = World.patches_array[PATCH_ROWS-3][2]
+        self.top_left = None
+        self.top_right = None
+        self.bottom_right = None
+        self.bottom_left = None
 
-    def reset(self):
+    def reset_all(self):
+        super().reset_all()
         self.travel_time = None
         self.top = None
         self.bottom = None
@@ -84,9 +122,13 @@ class Braess_World(World):
         self.top_prob = None
         self.bottom_prob = None
         self.middle_prob = None
+        self.top_left = None
+        self.top_right = None
+        self.bottom_right = None
+        self.bottom_left = None
 
     def setup_roads(self):
-        # 1. Cover everything in random green grass
+        # 1. Cover everything in random green grass (set all patches a random green color)
 
         # 2. Set colors and properties on all corners
         self.top_left.set_color(Color('Green'))
@@ -101,7 +143,18 @@ class Braess_World(World):
         # 5. Draw the middle road based on whether it's on or off
 
 
-    def draw_roads(self, type_of_road, start, finish):
+    def draw_road(self, type_of_road, start, finish):
+        # Road types are:
+        # 0 - Static congestion road
+        # 1 - Dynamic congestion road
+        # 3 - Middle road
+        # 4 - Deactivated middle road
+        # Calculate the direction of the heading from start to finish
+        # Loop and go through the patches in the direction of your heading
+        # For middle roads, set yourself, left, and bottom patches to gray or textured depending on middle-on
+        # For horizontal roads, color the patches on the top and bottom of your path.
+        # For vertical roads, color the patches on the left and right of your path to the finish.
+        # We can also set attributes such as delay, road-type, and base-delay for these patches as we iterate
         pass
 
     def check_middle(self):
@@ -116,11 +169,16 @@ class Braess_World(World):
         pass
 
     def spawn_commuters(self):
+        # Note we probably won't use 250.
+        # track spawn-time, if spawn-time is greater than 250 / spawn-rate,
+        # at the patch in the upper left corner, spawn a commuter
+        # with several values associated with time spawned, the time it is still commuting,
+        # the route it will take, and it's behavior when choosing a route
         pass
 
     def setup(self):
         # Clear everything
-        self.clear_all()
+        self.reset_all()
 
         # Set the corner patches
         self.top_left: Patch = World.patches_array[2][2]
@@ -132,7 +190,10 @@ class Braess_World(World):
         self.setup_roads()
 
     def go(self):
+        # Constantly check the middle in case it's activated mid-go
         self.check_middle()
+
+        # Keep spawning commuters
         self.spawn_commuters()
 
         for commuter in World.agents:
@@ -141,6 +202,21 @@ class Braess_World(World):
         for patch in [patches for patches in World.patches if patches.road_type == 1]:
             patch.determine_congestion()
 
+    def emp_analytical(self):
+        # check each route available, counting the number of commuters in each route
+        # the commuter will take the path that with the least number of other commuters
+        # Returns 0, 1, or 2
+        pass
+
+    def best_known_w_ran_dev(self):
+        # Pick a route that has the best travel time with the gui's randomness chance to deviate to a longer route.
+        # Returns 0, 1, or 2
+        pass
+
+    def probabilistic_greedy(self):
+        # Picks a route by the probability of how "good it is" (by travel time).
+        # Returns 0, 1, or 2
+        pass
 
 
 # GUI
@@ -161,7 +237,7 @@ braess_left_upper = [
 
     [sg.Text(spawn_rate, pad=((0,0),(15,0))),
      sg.Slider(key='spawn_rate', range=(1, 10), resolution=1, default_value=10,
-            orientation='horizontal', size=(10, 20))],
+               orientation='horizontal', size=(10, 20))],
 
     [sg.Text(smoothing, pad=((0, 0), (20, 0))),
      sg.Slider(key='smoothing', range=(1, 10), resolution=1, default_value=1,
