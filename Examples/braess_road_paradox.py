@@ -2,11 +2,12 @@
 
 from pygame import color
 from core.agent import Agent
-from core.pairs import center_pixel, RowCol
+from core.pairs import center_pixel, RowCol, Pixel_xy, Velocity
 from core.sim_engine import SimEngine
 from core.world_patch_block import World, Patch
 from pygame.color import Color
-from core.gui import PATCH_ROWS, PATCH_COLS
+from core.gui import PATCH_ROWS, PATCH_COLS, SCREEN_PIXEL_WIDTH, SCREEN_PIXEL_HEIGHT
+from random import uniform
 
 # TODO -- Testing:
 # Test spawn-commuters rate and make sure we have constants good enough for the tickrate
@@ -15,11 +16,19 @@ from core.gui import PATCH_ROWS, PATCH_COLS
 # Constantly check our numbers for smoothing and averages for NetLogo-like results
 # Test what happens when there are multiple turtles on one patch
 
+middle_road = 'middle'
+dynamic_road = 'dynamic'
+static_road = 'static'
+
 # We specify our own subclass of Agent, so we can add some additional properties.
 class Commuter(Agent):
 
-    def __init__(self):
-        super().__init__(center_pixel=center_pixel, color=color, scale=1)
+    def __init__(self, spawn_pixel: Pixel_xy, facing: Pixel_xy):
+        super().__init__(center_pixel=spawn_pixel, color=Color('Yellow'), scale=1)
+        self.set_velocity(Velocity((1,0)))
+        self.face_xy(facing)
+
+        self.recently_changed = False
         self.birth_tick = None
         self.ticks_here = None
         self.route = None
@@ -71,8 +80,8 @@ class Commuter(Agent):
 # We specify our own subclass of Patch, so we can add some additional properties.
 class Braess_Patch(Patch):
 
-    def __init__(self):
-        super().__init__(row_col=RowCol.patch_to_center_pixel(), color=Color("Black"))
+    def __init__(self, row_col: RowCol, color=Color('black')):
+        super.__init__(row_col.patch_to_center_pixel(), color)
         self.delay = None
         self.base_delay = None
         self.road_type = None
@@ -95,7 +104,7 @@ class Braess_World(World):
         self.top = None
         self.bottom = None
         self.middle = None
-        self.spawn_time = None
+        self.spawn_time = 0
         self.middle_prev = None
         self.avg = None
         self.cars_spawned = None
@@ -109,13 +118,18 @@ class Braess_World(World):
         self.bottom_right = None
         self.bottom_left = None
 
+        self.top_left_center_pixel = None
+        self.top_right_center_pixel = None
+        self.bottom_right_center_pixel = None
+        self.bottom_left_center_pixel = None
+
     def reset_all(self):
         super().reset_all()
         self.travel_time = None
         self.top = None
         self.bottom = None
         self.middle = None
-        self.spawn_time = None
+        self.spawn_time = 0
         self.middle_prev = None
         self.avg = None
         self.cars_spawned = None
@@ -145,10 +159,19 @@ class Braess_World(World):
 
     def draw_road(self, type_of_road, start, finish):
         # Road types are:
-        # 0 - Static congestion road
-        # 1 - Dynamic congestion road
-        # 3 - Middle road
-        # 4 - Deactivated middle road
+        # 'static' - Static congestion road
+        # 'dynamic' - Dynamic congestion road
+        # 'middle' - Middle road
+
+        if type_of_road == static_road:
+            pass
+        elif type_of_road == dynamic_road:
+            pass
+        # Middle Road ... type_of_road == middle_road
+        else:
+            pass
+
+
         # Calculate the direction of the heading from start to finish
         # Loop and go through the patches in the direction of your heading
         # For middle roads, set yourself, left, and bottom patches to gray or textured depending on middle-on
@@ -169,6 +192,16 @@ class Braess_World(World):
         pass
 
     def spawn_commuters(self):
+
+        if self.spawn_time > 250/SimEngine.gui_get('spawn_rate'):
+            # self.agent_class() creates a class at a certain pixel.
+            # This line creates an agent at the center pixel of the top left patch.
+            self.agent_class(spawn_pixel=self.top_left_center_pixel,
+                             facing=self.top_right_center_pixel)
+            self.spawn_time = 0
+        else:
+            self.spawn_time += 1
+
         # Note we probably won't use 250.
         # track spawn-time, if spawn-time is greater than 250 / spawn-rate,
         # at the patch in the upper left corner, spawn a commuter
@@ -181,26 +214,44 @@ class Braess_World(World):
         self.reset_all()
 
         # Set the corner patches
-        self.top_left: Patch = World.patches_array[2][2]
-        self.top_right: Patch = World.patches_array[2][PATCH_COLS-3]
-        self.bottom_right: Patch = World.patches_array[PATCH_ROWS - 3][PATCH_COLS - 3]
-        self.bottom_left: Patch = World.patches_array[PATCH_ROWS-3][2]
+        self.top_left: Braess_Patch = World.patches_array[2][2]
+        self.top_right: Braess_Patch = World.patches_array[2][PATCH_COLS-3]
+        self.bottom_right: Braess_Patch = World.patches_array[PATCH_ROWS - 3][PATCH_COLS - 3]
+        self.bottom_left: Braess_Patch = World.patches_array[PATCH_ROWS-3][2]
+
+        self.top_left_center_pixel = self.top_left.row_col.patch_to_center_pixel()
+        self.top_right_center_pixel = self.top_right.row_col.patch_to_center_pixel()
+        self.bottom_right_center_pixel = self.bottom_right.row_col.patch_to_center_pixel()
+        self.bottom_left_center_pixel = self.bottom_left.row_col.patch_to_center_pixel()
 
         # Set up the roads
         self.setup_roads()
 
-    def go(self):
+    def step(self):
         # Constantly check the middle in case it's activated mid-go
-        self.check_middle()
+        # self.check_middle()
 
         # Keep spawning commuters
         self.spawn_commuters()
 
-        for commuter in World.agents:
-            commuter.move()
+        # for commuter in World.agents:
+        #     commuter.move()
+        #
+        # for patch in [patches for patches in World.patches if patches.road_type == 1]:
+        #     patch.determine_congestion()
 
-        for patch in [patches for patches in World.patches if patches.road_type == 1]:
-            patch.determine_congestion()
+        for agent in self.agents:
+            agent.forward(1)
+            agent.route = 2
+
+        # Agents in the top right patch
+        agents_in_top_right = self.top_right.agents
+        # Loop through the agents and check if they are going for the middle route.
+        for agent in agents_in_top_right:
+            if agent.route == 2 and not agent.recently_changed:
+                agent.move_to_xy(self.top_right_center_pixel)
+                agent.face_xy(self.bottom_left_center_pixel)
+                agent.recently_changed = True
 
     def emp_analytical(self):
         # check each route available, counting the number of commuters in each route
