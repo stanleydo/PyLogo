@@ -24,6 +24,7 @@ emp_analytical = 'Empirical Analytical'
 best_known_w_ran_dev = 'Best Known w/ Random Deviation'
 probabilistic_greedy = 'Probabilistic Greedy'
 random_route = 'Random'
+selfish = 'Selfish Route'
 
 # We specify our own subclass of Agent, so we can add some additional properties.
 class Commuter(Agent):
@@ -31,6 +32,7 @@ class Commuter(Agent):
     def __init__(self, spawn_pixel: Pixel_xy, speed: float):
         super().__init__(center_pixel=spawn_pixel, color=Color('Yellow'), scale=1)
         self.speed = speed
+        self.base_speed = 3.0
 
         self.last_patch = None
 
@@ -111,7 +113,8 @@ class Braess_World(World):
         self.route_dict = {random_route: self.random_route,
                            emp_analytical: self.emp_analytical,
                            best_known_w_ran_dev: self.best_known_w_ran_dev,
-                           probabilistic_greedy: self.probabilistic_greedy}
+                           probabilistic_greedy: self.probabilistic_greedy,
+                           selfish: self.selfish_route}
 
     def reset_all(self):
         super().reset_all()
@@ -209,19 +212,27 @@ class Braess_World(World):
 
     def spawn_commuters(self):
 
-        if self.spawn_time > 250/SimEngine.gui_get('spawn_rate'):
+        if self.spawn_time >= 250//SimEngine.gui_get('spawn_rate'):
+            time = 0
+            if SimEngine.gui_get('mode') == selfish:
+                route, time = self.route_dict[SimEngine.gui_get('mode')]()
+            else:
+                route = self.route_dict[SimEngine.gui_get('mode')]()
             # self.agent_class() creates a class at a certain pixel.
             # This line creates an agent at the center pixel of the top left patch.
-            new_commuter: Commuter = self.agent_class(spawn_pixel=self.top_left_center_pixel, speed=SimEngine.gui_get('speed'))
-            self.cars_spawned += 1
-            new_commuter.route = self.route_dict[SimEngine.gui_get('mode')]()
+            new_commuter: Commuter = self.agent_class(spawn_pixel=self.top_left_center_pixel, speed=0.0)
+            new_commuter.route = route
+
+            new_commuter.base_speed = new_commuter.base_speed - time
+            new_commuter.speed = new_commuter.base_speed
+
             if new_commuter.route in (middle_road, dynamic_road):
                 new_commuter.face_xy(self.top_right_center_pixel)
             # Static Route
             else:
                 new_commuter.face_xy(self.bottom_left_center_pixel)
 
-            self.spawn_time = 0
+            self.spawn_time = 1
 
         else:
             self.spawn_time += 1
@@ -252,7 +263,13 @@ class Braess_World(World):
         self.setup_roads()
 
     def step(self):
+
+        SimEngine.gui_set(key='ticks', value=self.ticks)
         commuters_finished = []
+        nbr_commuters = 0
+        nbr_commuters_dynamic = 0
+        nbr_commuters_static = 0
+        nbr_commuters_middle = 0
         # Constantly check the middle in case it's activated mid-go
         # self.check_middle()
 
@@ -260,19 +277,28 @@ class Braess_World(World):
         self.spawn_commuters()
 
         for commuter in self.agents:
+            nbr_commuters += 1
+
+            if commuter.route == dynamic_road:
+                nbr_commuters_dynamic += 1
+            elif commuter.route == static_road:
+                nbr_commuters_static += 1
+            else:
+                nbr_commuters_middle += 1
+
             current_patch = commuter.current_patch()
 
             if commuter.last_patch != current_patch:
                 if current_patch == self.top_right:
                     commuter.move_to_xy(self.top_right_center_pixel)
                     if commuter.route == middle_road:
-                        commuter.speed = 15.0
+                        commuter.speed = 25.0
                         commuter.move(turn_towards=self.bottom_left_center_pixel)
                     else:
                         commuter.move(turn_towards=self.bottom_right_center_pixel)
                 elif current_patch == self.bottom_left:
                     if commuter.route == middle_road:
-                        commuter.speed = SimEngine.gui_get('speed')
+                        commuter.speed = commuter.base_speed
                     commuter.move_to_xy(self.bottom_left_center_pixel)
                     commuter.move(turn_towards=self.bottom_right_center_pixel)
                 elif current_patch == self.bottom_right:
@@ -284,10 +310,41 @@ class Braess_World(World):
             commuter.last_patch = current_patch
 
         for finished_commuter in commuters_finished:
+            nbr_commuters -= 1
             finished_commuter.die()
 
+        SimEngine.gui_set(key='nbr_commuters', value=nbr_commuters)
+        SimEngine.gui_set(key='nbr_commuters_dynamic', value=nbr_commuters_dynamic)
+        SimEngine.gui_set(key='nbr_commuters_static', value=nbr_commuters_static)
+        SimEngine.gui_set(key='nbr_commuters_middle', value=nbr_commuters_middle)
+
     def selfish_route(self):
-        pass
+        agents_on_dynamic_road = 0
+        agents_on_static_road = 0
+        agents_on_middle_road = 0
+
+        for commuter in self.agents:
+            if commuter.route == dynamic_road:
+                agents_on_dynamic_road += 1
+            elif commuter.route == static_road:
+                agents_on_static_road += 1
+            else:
+                agents_on_middle_road += 1
+
+        static_road_rate = SimEngine.gui_get('static')
+        dynamic_road_rate = SimEngine.gui_get('dynamic')
+
+        static_road_time = static_road_rate + (agents_on_middle_road + agents_on_static_road) / dynamic_road_rate
+        middle_road_time = ((agents_on_dynamic_road + agents_on_middle_road) / dynamic_road_rate) \
+                           + ((agents_on_static_road + agents_on_middle_road) / dynamic_road_rate)
+        dynamic_road_time = (agents_on_dynamic_road / dynamic_road_rate) + static_road_rate
+
+        three_roads = [(static_road, static_road_time/20),
+                       (middle_road, middle_road_time/20),
+                       (dynamic_road, dynamic_road_time/20)]
+        selection = min(three_roads, key=lambda x: x[1])
+
+        return selection
 
     def random_route(self):
         return choice([middle_road, dynamic_road, static_road])
@@ -296,7 +353,38 @@ class Braess_World(World):
         # check each route available, counting the number of commuters in each route
         # the commuter will take the path that with the least number of other commuters
         # Returns 0, 1, or 2
-        pass
+        tt = 0
+        tb = 0
+        tm = 0
+        if tt == 0 or tb == 0 or tm == 0:
+            return choice([middle_road, dynamic_road, static_road])
+        if SimEngine.gui_get(middle_on) is True:
+            t_score = ((tt + tm)/(tt + tb + tm)) * 1 + 1
+            b_score = ((tb + tm)/(tt + tb + tm)) * 1 + 1
+            m_score = (tm/(tt + tb + tm)) * 2
+            if t_score < b_score and t_score < m_score:
+                return dynamic_road
+            if b_score < m_score and b_score < t_score:
+                return static_road
+            if t_score == b_score and t_score == m_score:
+                return choice([middle_road, dynamic_road, static_road])
+            else:
+                return middle_road
+        else:
+            return choice([dynamic_road, static_road])
+            t_score = tt / (tt + tb) * 1 + 1
+            b_score = tb / (tt + tb) * 1 + 1
+            if t_score < b_score:
+                return dynamic_road
+            else:
+                return static_road
+        for commuter in self.agents:
+            if commuter.route == dynamic_road:
+                tt += 1
+            if commuter.route == static_road:
+                tb += 1
+            if commuter.route == middle_road:
+                tm += 1
 
     def best_known_w_ran_dev(self):
         # Pick a route that has the best travel time with the gui's randomness chance to deviate to a longer route.
@@ -387,7 +475,15 @@ spawn_rate = 'Spawn Rate' # key is 'spawn_rate'
 smoothing = 'Smoothing' # key is 'smoothing'
 mode = 'Mode' # key is 'mode'
 randomness = 'Randomness' # key is 'randomness'
-base_speed = 'Base Speed' # key is 'speed'
+static = 'Static Road Times'
+dynamic = 'Dynamic Road Times'
+
+ticks = 'Ticks:'
+
+commuters = 'Total Commuters:'
+commuters_static = 'On Static Route'
+commuters_dynamic = 'On Dynamic Route'
+commuters_middle = 'On Braess Route'
 
 braess_left_upper = [
     [sg.Checkbox('Middle On?', default=True, key='middle_on')],
@@ -401,18 +497,37 @@ braess_left_upper = [
                orientation='horizontal', size=(10, 20))],
 
     [sg.Text(mode, pad=((0, 0), (20, 0))),
-     sg.Combo([emp_analytical, best_known_w_ran_dev, probabilistic_greedy, random_route], key='mode',
+     sg.Combo([emp_analytical, best_known_w_ran_dev, probabilistic_greedy, random_route, selfish], key='mode',
               default_value=emp_analytical, size=(28,20), pad=((0, 0), (20, 0)))],
 
     [sg.Text(randomness, pad=((0, 0), (15, 0))),
      sg.Slider(key='randomness', range=(0,100), resolution=1, default_value=0,
                orientation='horizontal', size=(10, 20))],
 
-    [sg.Text(base_speed, pad=((0, 0), (15, 0))),
-     sg.Slider(key='speed', range=(0.5, 5.0), resolution=0.5, default_value=3.0,
+    [sg.Text(static, pad=((0, 0), (15, 0))),
+     sg.Slider(key='static', range=(0, 100), resolution=1, default_value=10,
+               orientation='horizontal', size=(10, 20))],
+
+    [sg.Text(dynamic, pad=((0, 0), (15, 0))),
+     sg.Slider(key='dynamic', range=(1, 100), resolution=1, default_value=10,
                orientation='horizontal', size=(10, 20))]
+]
+
+braess_right_upper = [
+    [sg.Text(ticks),
+     sg.Text(0, key='ticks', size=(6,0))],
+
+    [sg.Text(commuters),
+     sg.Text(0, key='nbr_commuters', size=(4, 0)),
+     sg.Text(commuters_dynamic),
+     sg.Text(0, key='nbr_commuters_dynamic', size=(4, 0)),
+     sg.Text(commuters_static),
+     sg.Text(0, key='nbr_commuters_static', size=(4, 0)),
+     sg.Text(commuters_middle),
+     sg.Text(0, key='nbr_commuters_middle', size=(4, 0))]
 ]
 
 if __name__ == '__main__':
     from core.agent import PyLogo
-    PyLogo(Braess_World, "Braess' Road Paradox", gui_left_upper=braess_left_upper, agent_class=Commuter, auto_setup=False)
+    PyLogo(Braess_World, "Braess' Road Paradox", gui_left_upper=braess_left_upper, gui_right_upper=braess_right_upper,
+           agent_class=Commuter, auto_setup=False)
