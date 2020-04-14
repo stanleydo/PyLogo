@@ -152,6 +152,8 @@ class Braess_World(World):
 
         self.draw_roads()
 
+        self.draw_middle(SimEngine.gui_get('middle_on'))
+
         # 3. Draw roads between corners
 
         # 4. Set global variable middle_prev to the middle_on from the GUI.
@@ -170,6 +172,7 @@ class Braess_World(World):
             for row in range(3, PATCH_ROWS-3):
                 self.patches_array[row][col].set_color(Color(100, 100, 100))
 
+        self.draw_middle(SimEngine.gui_get('middle_on'))
 
         # Calculate the direction of the heading from start to finish
         # Loop and go through the patches in the direction of your heading
@@ -180,18 +183,42 @@ class Braess_World(World):
         pass
 
     def draw_middle(self, on_off):
-        if on_off == 'On':
-            pass
+
+        i = PATCH_ROWS - 5
+        j = 4
+        cur = self.patches_array[i][j]
+        while j < PATCH_COLS - 4:
+            cur = self.patches_array[i][j]
+            for patch in set(cur.neighbors_8()):
+                patch.set_color(Color(100, 100, 100))
+            i -= 1
+            j += 1
+
+        if on_off:
+            i = PATCH_ROWS - 5
+            j = 4
+            cur = self.patches_array[i][j]
+            while j < PATCH_COLS - 4:
+                cur = self.patches_array[i][j]
+                cur.set_color(Color('Black'))
+                i -= 1
+                j += 1
         else:
-            pass
-        pass
+            i = PATCH_ROWS - 5
+            j = 4
+            cur = self.patches_array[i][j]
+            while j < PATCH_COLS - 4:
+                cur = self.patches_array[i][j]
+                cur.set_color(Color(100,100,100))
+                i -= 1
+                j += 1
 
     def check_middle(self):
         # Check-Middle
         # If the middle-on? (GUI) doesn't match the previous middle-on, then do this:
         if self.middle != self.middle_prev:
             if self.middle:
-                self.draw_middle('On')
+                self.draw_middle(True)
                 self.middle_prev = True
             else:
                 num_agents_taking_middle = 0
@@ -199,7 +226,7 @@ class Braess_World(World):
                     if commuter.route == middle_road:
                         num_agents_taking_middle += 1
                 if num_agents_taking_middle == 0:
-                    self.draw_middle('Off')
+                    self.draw_middle(False)
                     self.middle_prev = False
 
         # If the the middle is ON(True), draw road a road from the top right to the bottom left with road type 3 (Activated Middle).
@@ -209,6 +236,12 @@ class Braess_World(World):
         # Draw a road with type 4 from the top right to bottom left (Deactivated road)
         # Then, set the middle-prev to OFF (False)
         pass
+
+    def handle_event(self, _event):
+        super().handle_event(_event)
+
+        if _event == 'middle_on':
+            self.draw_middle(SimEngine.gui_get('middle_on'))
 
     def spawn_commuters(self):
 
@@ -339,15 +372,22 @@ class Braess_World(World):
                            + ((agents_on_static_road + agents_on_middle_road) / dynamic_road_rate)
         dynamic_road_time = (agents_on_dynamic_road / dynamic_road_rate) + static_road_rate
 
-        three_roads = [(static_road, static_road_time/20),
+        if SimEngine.gui_get('middle_on'):
+            roads_available = [(static_road, static_road_time/20),
                        (middle_road, middle_road_time/20),
                        (dynamic_road, dynamic_road_time/20)]
-        selection = min(three_roads, key=lambda x: x[1])
+        else:
+            roads_available = [(static_road, static_road_time/20), (dynamic_road, dynamic_road_time/20)]
+
+        selection = min(roads_available, key=lambda x: x[1])
 
         return selection
 
     def random_route(self):
-        return choice([middle_road, dynamic_road, static_road])
+        if SimEngine.gui_get(middle_on) is True:
+            return choice([middle_road, dynamic_road, static_road])
+        else:
+            return choice([dynamic_road, static_road])
 
     def emp_analytical(self):
         # check each route available, counting the number of commuters in each route
@@ -356,8 +396,16 @@ class Braess_World(World):
         tt = 0
         tb = 0
         tm = 0
+
         if tt == 0 or tb == 0 or tm == 0:
             return choice([middle_road, dynamic_road, static_road])
+        for commuter in self.agents:
+            if commuter.route == dynamic_road:
+                tt += 1
+            if commuter.route == static_road:
+                tb += 1
+            else:
+                tm += 1
         if SimEngine.gui_get(middle_on) is True:
             t_score = ((tt + tm)/(tt + tb + tm)) * 1 + 1
             b_score = ((tb + tm)/(tt + tb + tm)) * 1 + 1
@@ -378,93 +426,38 @@ class Braess_World(World):
                 return dynamic_road
             else:
                 return static_road
-        for commuter in self.agents:
-            if commuter.route == dynamic_road:
-                tt += 1
-            if commuter.route == static_road:
-                tb += 1
-            if commuter.route == middle_road:
-                tm += 1
 
     def best_known_w_ran_dev(self):
         # Pick a route that has the best travel time with the gui's randomness chance to deviate to a longer route.
         # Returns 0, 1, or 2
+        agents_on_dynamic_road = 0
+        agents_on_static_road = 0
+        agents_on_middle_road = 0
+        static_road_rate = SimEngine.gui_get('static')
+        dynamic_road_rate = SimEngine.gui_get('dynamic')
+        static_road_time = static_road_rate + (agents_on_middle_road + agents_on_static_road) / dynamic_road_rate
+        middle_road_time = ((agents_on_dynamic_road + agents_on_middle_road) / dynamic_road_rate) \
+                           + ((agents_on_static_road + agents_on_middle_road) / dynamic_road_rate)
+        dynamic_road_time = (agents_on_dynamic_road / dynamic_road_rate) + static_road_rate
         r = SimEngine.gui_get(randomness)
-        if SimEngine.gui_get(middle_on):
-            if self.middle == 0 or self.top == 0 or self.bottom == 0:
-                return choice([middle_road, dynamic_road, static_road])
-            if randint(0, 101) < 100 - r:
-                if self.middle < self.top and self.middle < self.bottom:
-                    return middle_road
-                if self.top < self.middle and self.top < self.bottom:
-                    return dynamic_road
-                else:
-                    return static_road
-            else:
-                return choice([middle_road, dynamic_road, static_road])
-        else:
-            if self.top == 0 or self.bottom == 0:
-                return choice([dynamic_road, static_road])
-            if randint(0, 101) < 100 - r:
-                if self.top < self.bottom:
-                    return static_road
-                else:
-                    return dynamic_road
-            else:
-                return choice([middle_road, dynamic_road, static_road])
+        if agents_on_dynamic_road == 0 or agents_on_static_road == 0 or agents_on_middle_road == 0:
+            return choice([dynamic_road, static_road])
 
     def probabilistic_greedy(self):
         # Picks a route by the probability of how "good it is" (by travel time).
         # Returns 0, 1, or 2
+        agents_on_dynamic_road = 0
+        agents_on_static_road = 0
+        agents_on_middle_road = 0
+        static_road_rate = SimEngine.gui_get('static')
+        dynamic_road_rate = SimEngine.gui_get('dynamic')
+        static_road_time = static_road_rate + (agents_on_middle_road + agents_on_static_road) / dynamic_road_rate
+        middle_road_time = ((agents_on_dynamic_road + agents_on_middle_road) / dynamic_road_rate) \
+                           + ((agents_on_static_road + agents_on_middle_road) / dynamic_road_rate)
+        dynamic_road_time = (agents_on_dynamic_road / dynamic_road_rate) + static_road_rate
         r = SimEngine.gui_get(randomness)
-        if SimEngine.gui_get(middle_on):
-            if self.middle == 0 or self.top == 0 or self.bottom == 0:
-                return choice([middle_road, dynamic_road, static_road])
-            t_dif = 2 - self.top
-            if t_dif < 0:
-                t_dif = 0
-            t_dif = t_dif ^ (r / 10)
-            b_dif = 2 - self.bottom
-            if b_dif < 0:
-                b_dif = 0
-            b_dif = b_dif ^ (r / 10)
-            m_dif = 2 - self.middle
-            if m_dif < 0:
-                m_dif = 0
-            m_dif = m_dif ^ (r / 10)
-            sigma1 = 0
-            sigma2 = 0
-            if t_dif + b_dif + m_dif != 0:
-                sigma1 = t_dif / (t_dif + b_dif + m_dif)
-                sigma2 = b_dif / (t_dif + b_dif + m_dif)
-            else:
-                sigma1 = 0.33
-                sigma2 = 0.33
-            t_prob = sigma1
-            b_prob = sigma2
-            m_prob = 1 - sigma1 - sigma2
-            split1 = 1000 * sigma1
-            split2 = 1000 * (sigma1 + sigma2)
-            rand = randint(0, 1001)
-            if rand < split1:
-                return dynamic_road
-            if rand < split2:
-                return static_road
-            else:
-                return middle_road
-        if self.top == 0 or self.bottom == 0:
-            return middle_road
-        t_dif = 2 - self.top ^ (SimEngine.gui_get(randomness) / 10)
-        b_dif = 2 - self.bottom ^ (SimEngine.gui_get(randomness) / 10)
-        sigma = t_dif / (t_dif + b_dif)
-        t_prob = sigma
-        b_prob = 1 - sigma
-        split = 1000 * sigma
-        if randint(0, 1001) < split:
-            return dynamic_road
-        else:
-            return static_road
-
+        if agents_on_dynamic_road == 0 or agents_on_static_road == 0 or agents_on_middle_road == 0:
+            return choice([dynamic_road, static_road])
 
 # GUI
 
@@ -481,12 +474,12 @@ dynamic = 'Dynamic Road Times'
 ticks = 'Ticks:'
 
 commuters = 'Total Commuters:'
-commuters_static = 'On Static Route'
-commuters_dynamic = 'On Dynamic Route'
-commuters_middle = 'On Braess Route'
+commuters_static = 'On Static Route:'
+commuters_dynamic = 'On Dynamic Route:'
+commuters_middle = 'On Braess Route:'
 
 braess_left_upper = [
-    [sg.Checkbox('Middle On?', default=True, key='middle_on')],
+    [sg.Checkbox('Middle On?', default=True, key='middle_on', enable_events=True)],
 
     [sg.Text(spawn_rate, pad=((0,0),(15,0))),
      sg.Slider(key='spawn_rate', range=(1, 50), resolution=1, default_value=10,
