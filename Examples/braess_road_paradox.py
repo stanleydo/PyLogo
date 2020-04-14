@@ -7,7 +7,7 @@ from core.sim_engine import SimEngine
 from core.world_patch_block import World, Patch
 from pygame.color import Color
 from core.gui import PATCH_ROWS, PATCH_COLS, SCREEN_PIXEL_WIDTH, SCREEN_PIXEL_HEIGHT
-from random import uniform
+from random import choice
 
 # TODO -- Testing:
 # Test spawn-commuters rate and make sure we have constants good enough for the tickrate
@@ -20,62 +20,43 @@ middle_road = 'middle'
 dynamic_road = 'dynamic'
 static_road = 'static'
 
+BASE_SPEED = 2.0
+
 # We specify our own subclass of Agent, so we can add some additional properties.
 class Commuter(Agent):
 
-    def __init__(self, spawn_pixel: Pixel_xy, facing: Pixel_xy):
+    def __init__(self, spawn_pixel: Pixel_xy, speed: float = BASE_SPEED):
         super().__init__(center_pixel=spawn_pixel, color=Color('Yellow'), scale=1)
-        self.set_velocity(Velocity((1,0)))
-        self.face_xy(facing)
+        self.speed = speed
 
-        self.recently_changed = False
+        self.last_patch = None
+
         self.birth_tick = None
         self.ticks_here = None
         self.route = None
 
-    def move(self):
-        # We can use self.current_patch() to get the patch this agent is on.
-        my_patch = self.current_patch()
+    def move(self, turn_towards: Pixel_xy = None):
+        self.forward(self.speed)
 
-        # If I've been here long enough, set the patch's last_here to the World's ticks and move 1 unit
-        if self.ticks_here > my_patch.delay:
-            my_patch.last_here = World.ticks
-            # Move commuter to next patch (in direction its facing)
-            # Can be implemented by facing_xy and moving it 1 unit in that direction.
-            #Re-set ticks_here to 1
-        else:
-            self.ticks_here += 1
+        if turn_towards:
+            self.face_xy(turn_towards)
 
-        # if I reach the top-right and my route is 0, face the bottom right
-        # if I reach the top-right and my route is 2, face the bottom left
-        # if I reach the bottom left, face the bottom right
-        # if I reach the bottom right, i end my commute.
-
-    def new_route(self):
-        # new-route
-        # in an if-else statement, check the mode selected from the interface
-        # go to the associated method
-        m = SimEngine.gui_get('mode')
-        if m == emp_analytical:
-            World.emp_analytical()
-        if m == best_known_w_ran_dev:
-            World.best_known_w_ran_dev()
-        if m == probabilistic_greedy:
-            World.probabilistic_greedy()
+    def die(self):
+        World.agents.remove(self)
 
     def end_commute(self):
         # Reports the average travel time.
         # Also reports top, bottom, and middle travel times of the last commuter to end.
-        World.travel_time = (World.ticks - self.birth_tick) / 450
-        World.avg = World.travel_time if World.avg == 0 else ((19 * World.avg + World.travel_time) / 20)
-        if self.route == 0:
-            World.top = World.travel_time if World.top == 0 else ((World.travel_time) + \
-                                                                  ((World.smoothing - 1) * World.top)) / World.smoothing
-        if self.route == 1:
-            World.bottom = World.travel_time if World.bottom == 0 else ((World.travel_time)+ \
-                                                                        ((World.smoothing - 1) * World.bottom)) / World.smoothing
+        # World.travel_time = (World.ticks - self.birth_tick) / 450
+        # World.avg = World.travel_time if World.avg == 0 else ((19 * World.avg + World.travel_time) / 20)
+        # if self.route == 0:
+        #     World.top = World.travel_time if World.top == 0 else ((World.travel_time) + \
+        #                                                           ((World.smoothing - 1) * World.top)) / World.smoothing
+        # if self.route == 1:
+        #     World.bottom = World.travel_time if World.bottom == 0 else ((World.travel_time)+ \
+        #                                                                 ((World.smoothing - 1) * World.bottom)) / World.smoothing
         # Calculate and set World.middle
-        self.kill()
+        pass
 
 # We specify our own subclass of Patch, so we can add some additional properties.
 class Braess_Patch(Patch):
@@ -196,9 +177,16 @@ class Braess_World(World):
         if self.spawn_time > 250/SimEngine.gui_get('spawn_rate'):
             # self.agent_class() creates a class at a certain pixel.
             # This line creates an agent at the center pixel of the top left patch.
-            self.agent_class(spawn_pixel=self.top_left_center_pixel,
-                             facing=self.top_right_center_pixel)
+            new_commuter: Commuter = self.agent_class(spawn_pixel=self.top_left_center_pixel, speed=BASE_SPEED)
+            new_commuter.route = self.random_route()
+            if new_commuter.route in (middle_road, dynamic_road):
+                new_commuter.face_xy(self.top_right_center_pixel)
+            # Static Route
+            else:
+                new_commuter.face_xy(self.bottom_left_center_pixel)
+
             self.spawn_time = 0
+
         else:
             self.spawn_time += 1
 
@@ -228,30 +216,44 @@ class Braess_World(World):
         self.setup_roads()
 
     def step(self):
+        commuters_finished = []
         # Constantly check the middle in case it's activated mid-go
         # self.check_middle()
 
         # Keep spawning commuters
         self.spawn_commuters()
 
-        # for commuter in World.agents:
-        #     commuter.move()
-        #
-        # for patch in [patches for patches in World.patches if patches.road_type == 1]:
-        #     patch.determine_congestion()
+        for commuter in self.agents:
+            current_patch = commuter.current_patch()
 
-        for agent in self.agents:
-            agent.forward(1)
-            agent.route = 2
+            if commuter.last_patch != current_patch:
+                if current_patch == self.top_right:
+                    commuter.move_to_xy(self.top_right_center_pixel)
+                    if commuter.route == middle_road:
+                        commuter.speed = BASE_SPEED * 4
+                        print(commuter.speed)
+                        commuter.move(turn_towards=self.bottom_left_center_pixel)
+                    else:
+                        commuter.move(turn_towards=self.bottom_right_center_pixel)
+                elif current_patch == self.bottom_left:
+                    if commuter.route == middle_road:
+                        commuter.speed = BASE_SPEED
+                        print(commuter.speed)
+                    commuter.move_to_xy(self.bottom_left_center_pixel)
+                    commuter.move(turn_towards=self.bottom_right_center_pixel)
+                elif current_patch == self.bottom_right:
+                    commuter.end_commute()
+                    commuters_finished.append(commuter)
+            else:
+                commuter.move()
 
-        # Agents in the top right patch
-        agents_in_top_right = self.top_right.agents
-        # Loop through the agents and check if they are going for the middle route.
-        for agent in agents_in_top_right:
-            if agent.route == 2 and not agent.recently_changed:
-                agent.move_to_xy(self.top_right_center_pixel)
-                agent.face_xy(self.bottom_left_center_pixel)
-                agent.recently_changed = True
+            commuter.last_patch = current_patch
+
+        for finished_commuter in commuters_finished:
+            finished_commuter.die()
+
+    def random_route(self):
+        return choice([middle_road, dynamic_road, static_road])
 
     def emp_analytical(self):
         # check each route available, counting the number of commuters in each route
@@ -287,7 +289,7 @@ braess_left_upper = [
     [sg.Checkbox('Middle On?', default=True, key='middle_on')],
 
     [sg.Text(spawn_rate, pad=((0,0),(15,0))),
-     sg.Slider(key='spawn_rate', range=(1, 10), resolution=1, default_value=10,
+     sg.Slider(key='spawn_rate', range=(1, 20), resolution=1, default_value=10,
                orientation='horizontal', size=(10, 20))],
 
     [sg.Text(smoothing, pad=((0, 0), (20, 0))),
