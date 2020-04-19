@@ -52,11 +52,6 @@ class SimEngine:
         value = SimEngine.values.get(key, None) if not flip else not SimEngine.values.get('disabled', None)
         return int(value) if isinstance(value, float) and value == int(value) else value
 
-    # @staticmethod
-    # def gui_set(key, **kwargs):
-    #     # Replacement of 'enabled' with 'disabled' is done in gui.gui-set.
-    #     gui.gui_set(key, **kwargs)
-    #
     @staticmethod
     def gui_set(key, **kwargs):
         """
@@ -91,8 +86,10 @@ class SimEngine:
                 SimEngine.gui_set(GO_ONCE, enabled=True)
                 break
 
-            elif self.world._done():
-                SimEngine.gui_set(GOSTOP, enabled=False)
+            elif self.world.done:
+                SimEngine.gui_set(GOSTOP, enabled=True)
+                SimEngine.gui_set(GO_ONCE, enabled=True)
+                # self.world.done = False
                 break
 
             elif SimEngine.event == '__TIMEOUT__':
@@ -123,8 +120,6 @@ class SimEngine:
         self.draw_world()
 
         # Keep setup enabled in case the user wants to change from the default setup.
-        # if auto_setup:
-        #     SimEngine.gui_set('setup', enabled=False)
 
         # Let events come through pygame to this level.
         pg.event.set_grab(False)

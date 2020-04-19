@@ -7,19 +7,18 @@ from typing import Tuple
 import numpy as np
 from pygame.color import Color
 from pygame.rect import Rect
-from pygame.sprite import Sprite
 from pygame.surface import Surface
 
 import core.gui as gui
-# Importing this file eliminates the need for a globals declaration
+# Importing the file itself eliminates the need for a globals declaration
 # noinspection PyUnresolvedReferences
 import core.world_patch_block as world
 from core.gui import SHAPES
-from core.pairs import Pixel_xy, RowCol
+from core.pairs import Pixel_xy, RowCol, center_pixel
 from core.utils import get_class_name
 
 
-class Block(Sprite):
+class Block:  # (Sprite):
     """
     A generic patch/agent. Has a Pixel_xy but not necessarily a RowCol. Has a Color.
     """
@@ -45,7 +44,7 @@ class Block(Sprite):
         dist = sqrt(x_dist * x_dist + y_dist*y_dist)
         return dist
 
-    # Note that the actual drawing (blit and draw_line) takes place in core.gui.
+    # The actual drawing (blit and draw_line) takes place in core.gui.
     def draw(self, shape_name=None):
         if self.label:
             self.draw_label()
@@ -59,17 +58,11 @@ class Block(Sprite):
     def draw_label(self):
         offset = Block.patch_text_offset if isinstance(self, Patch) else Block.agent_text_offset
         text_center = Pixel_xy((self.rect.x + offset, self.rect.y + offset))
-        line_color = Color('white') if isinstance(self, Patch) and self.color == Color('black') else self.color
+        line_color = None if offset == 0 else \
+                     Color('white') if isinstance(self, Patch) and self.color == Color('black') else self.color
         obj_center = self.rect.center
-        gui.draw_label(self.label, text_center, obj_center, line_color)
-
-    # def draw_label(self):
-    #     text = gui.FONT.render(self.label, True, Color('black'), Color('white'))
-    #     offset = Block.patch_text_offset if isinstance(self, Patch) else Block.agent_text_offset
-    #     text_center = Pixel_xy((self.rect.x + offset, self.rect.y + offset))
-    #     gui.blit(text, text_center)
-    #     line_color = Color('white') if isinstance(self, Patch) and self.color == Color('black') else self.color
-    #     gui.draw_line(start_pixel=self.rect.center, end_pixel=text_center, line_color=line_color)
+        label = self.label
+        gui.draw_label(label, text_center, obj_center, line_color)
 
     @property
     def label(self):
@@ -154,14 +147,13 @@ class Patch(Block):
 
 class World:
 
-    patches_array: np.ndarray = None
-    patches = None
     agents = None
     links = None
 
-    ticks = None
+    patches = None
+    patches_array: np.ndarray = None
 
-    done = False
+    ticks = None
 
     def __init__(self, patch_class, agent_class):
 
@@ -171,6 +163,7 @@ class World:
         self.create_patches_array()
 
         self.agent_class = agent_class
+        self.done = False
         self.reset_all()
 
     @staticmethod
@@ -184,12 +177,12 @@ class World:
         for _ in range(nbr_agents):
             self.agent_class()
 
-    def create_ordered_agents(self, n, shape_name='netlogo_figure', radius=140):
+    def create_ordered_agents(self, n, shape_name='netlogo_figure', scale=1.4, color=None, radius=140):
         """
         Create n Agents with headings evenly spaced from 0 to 360
         Return a list of the Agents in the order created.
         """
-        agent_list = [self.agent_class(shape_name=shape_name) for _ in range(n)]
+        agent_list = [self.agent_class(shape_name=shape_name, scale=scale, color=color) for _ in range(n)]
         for (i, agent) in enumerate(agent_list):
             heading = i * 360 / n
             agent.set_heading(heading)
@@ -204,9 +197,14 @@ class World:
         # .flat is an iterator. Can't use it more than once.
         World.patches = list(World.patches_array.flat)
 
-    @staticmethod
-    def _done():
-        return World.done
+    def create_random_agents(self, n, shape_name='netlogo_figure', color=None, scale=1.4):
+        """
+        Create n Agents placed randomly on the screen. They are all facing the screen's center pixel.
+        """
+        for _ in range(n):
+            agent = self.agent_class(color=color, shape_name=shape_name, scale=scale)
+            agent.move_to_xy(Pixel_xy.random_pixel())
+            agent.face_xy(center_pixel())
 
     def draw(self):
         """ 
@@ -259,6 +257,7 @@ class World:
         return patch
 
     def reset_all(self):
+        self.done = False
         self.clear_all()
         self.reset_ticks()
 
