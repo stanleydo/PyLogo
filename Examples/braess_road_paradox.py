@@ -29,14 +29,14 @@ selfish = 'Selfish Route'
 # We specify our own subclass of Agent, so we can add some additional properties.
 class Commuter(Agent):
 
-    def __init__(self, spawn_pixel: Pixel_xy, speed: float):
+    def __init__(self, spawn_pixel: Pixel_xy, speed: float, birth_tick):
         super().__init__(center_pixel=spawn_pixel, color=Color('Yellow'), scale=1)
         self.speed = speed
         self.base_speed = 3.0
 
         self.last_patch = None
 
-        self.birth_tick = None
+        self.birth_tick = birth_tick
         self.ticks_here = None
         self.route = None
 
@@ -49,20 +49,6 @@ class Commuter(Agent):
     def die(self):
         World.agents.remove(self)
 
-    def end_commute(self):
-        # Reports the average travel time.
-        # Also reports top, bottom, and middle travel times of the last commuter to end.
-        # World.travel_time = (World.ticks - self.birth_tick) / 450
-        # World.avg = World.travel_time if World.avg == 0 else ((19 * World.avg + World.travel_time) / 20)
-        # if self.route == 0:
-        #     World.top = World.travel_time if World.top == 0 else ((World.travel_time) + \
-        #                                                           ((World.smoothing - 1) * World.top)) / World.smoothing
-        # if self.route == 1:
-        #     World.bottom = World.travel_time if World.bottom == 0 else ((World.travel_time)+ \
-        #                                                                 ((World.smoothing - 1) * World.bottom)) / World.smoothing
-        # Calculate and set World.middle
-        pass
-
 # We specify our own subclass of Patch, so we can add some additional properties.
 class Braess_Patch(Patch):
 
@@ -73,31 +59,17 @@ class Braess_Patch(Patch):
         self.road_type = None
         self.last_here = None
 
-    def determine_congestion(self):
-        # procedure for dynamic patches
-        # if patch last_here is nothing, we can go fast and set delay to base_delay / 2
-        # else we set the delay to be (((250 / spawn-rate)/(World.ticks - last_here + 1)) * base_delay)
-        # Then we set the patch color to be more red or yellow (255 G 0) depending on the calculation:
-        # 255 + floor (255 * (0.5 - (delay / base-delay))) by adding more or less green
-        pass
-
 # We specify our own subclass of World, so we can add some additional properties.
 class Braess_World(World):
 
     def __init__(self, patch_class, agent_class):
         super().__init__(patch_class, agent_class)
         self.middle_on = None
-        self.travel_time = None
         self.top = None
         self.bottom = None
         self.middle = None
         self.spawn_time = 0
         self.middle_prev = None
-        self.avg = None
-        self.cars_spawned = 0
-        self.top_prob = None
-        self.bottom_prob = None
-        self.middle_prob = None
 
         # Define the corner patches.
         self.top_left = None
@@ -115,24 +87,6 @@ class Braess_World(World):
                            best_known_w_ran_dev: self.best_known_w_ran_dev,
                            probabilistic_greedy: self.probabilistic_greedy,
                            selfish: self.selfish_route}
-
-    def reset_all(self):
-        super().reset_all()
-        self.travel_time = None
-        self.top = None
-        self.bottom = None
-        self.middle = None
-        self.spawn_time = 0
-        self.middle_prev = None
-        self.avg = None
-        self.cars_spawned = 0
-        self.top_prob = None
-        self.bottom_prob = None
-        self.middle_prob = None
-        self.top_left = None
-        self.top_right = None
-        self.bottom_right = None
-        self.bottom_left = None
 
     def setup_roads(self):
         # 1. Cover everything in random green grass (set all patches a random green color)
@@ -194,9 +148,10 @@ class Braess_World(World):
             i -= 1
             j += 1
 
+        i = PATCH_ROWS - 5
+        j = 4
+
         if on_off:
-            i = PATCH_ROWS - 5
-            j = 4
             cur = self.patches_array[i][j]
             while j < PATCH_COLS - 4:
                 cur = self.patches_array[i][j]
@@ -204,8 +159,6 @@ class Braess_World(World):
                 i -= 1
                 j += 1
         else:
-            i = PATCH_ROWS - 5
-            j = 4
             cur = self.patches_array[i][j]
             while j < PATCH_COLS - 4:
                 cur = self.patches_array[i][j]
@@ -253,7 +206,7 @@ class Braess_World(World):
                 route = self.route_dict[SimEngine.gui_get('mode')]()
             # self.agent_class() creates a class at a certain pixel.
             # This line creates an agent at the center pixel of the top left patch.
-            new_commuter: Commuter = self.agent_class(spawn_pixel=self.top_left_center_pixel, speed=0.0)
+            new_commuter: Commuter = self.agent_class(spawn_pixel=self.top_left_center_pixel, speed=0.0, birth_tick=self.ticks)
             new_commuter.route = route
 
             new_commuter.base_speed = new_commuter.base_speed - time
@@ -335,7 +288,7 @@ class Braess_World(World):
                     commuter.move_to_xy(self.bottom_left_center_pixel)
                     commuter.move(turn_towards=self.bottom_right_center_pixel)
                 elif current_patch == self.bottom_right:
-                    commuter.end_commute()
+                    SimEngine.gui_set(key='top', value=self.ticks - commuter.birth_tick)
                     commuters_finished.append(commuter)
             else:
                 commuter.move()
@@ -373,18 +326,19 @@ class Braess_World(World):
         dynamic_road_time = (agents_on_dynamic_road / dynamic_road_rate) + static_road_rate
 
         if SimEngine.gui_get('middle_on'):
-            roads_available = [(static_road, static_road_time/20),
-                       (middle_road, middle_road_time/20),
-                       (dynamic_road, dynamic_road_time/20)]
+            three_roads = [(static_road, static_road_time/20),
+                           (middle_road, middle_road_time/20),
+                           (dynamic_road, dynamic_road_time/20)]
+            selection = min(three_roads, key=lambda x: x[1])
         else:
-            roads_available = [(static_road, static_road_time/20), (dynamic_road, dynamic_road_time/20)]
-
-        selection = min(roads_available, key=lambda x: x[1])
+            two_roads = [(static_road, static_road_time / 20),
+                           (dynamic_road, dynamic_road_time / 20)]
+            selection = min(two_roads, key=lambda x: x[1])
 
         return selection
 
     def random_route(self):
-        if SimEngine.gui_get(middle_on) is True:
+        if SimEngine.gui_get(middle_on):
             return choice([middle_road, dynamic_road, static_road])
         else:
             return choice([dynamic_road, static_road])
@@ -456,8 +410,56 @@ class Braess_World(World):
                            + ((agents_on_static_road + agents_on_middle_road) / dynamic_road_rate)
         dynamic_road_time = (agents_on_dynamic_road / dynamic_road_rate) + static_road_rate
         r = SimEngine.gui_get(randomness)
-        if agents_on_dynamic_road == 0 or agents_on_static_road == 0 or agents_on_middle_road == 0:
-            return choice([dynamic_road, static_road])
+        if SimEngine.gui_get(middle_on):
+            if agents_on_dynamic_road == 0 or agents_on_static_road == 0 or agents_on_middle_road == 0:
+                return choice([middle_road, dynamic_road, static_road])
+            t_dif = 2 - dynamic_road_time
+            if t_dif < 0:
+                t_dif = 0
+            t_dif = t_dif ^ (r / 10)
+            b_dif = 2 - static_road_time
+            if b_dif < 0:
+                b_dif = 0
+            b_dif = b_dif ^ (r / 10)
+            m_dif = 2 - middle_road_time
+            if m_dif < 0:
+                m_dif = 0
+            m_dif = m_dif ^ (r / 10)
+            sigma1 = 0
+            sigma2 = 0
+            if t_dif + b_dif + m_dif != 0:
+                sigma1 = t_dif / (t_dif + b_dif + m_dif)
+                sigma2 = b_dif / (t_dif + b_dif + m_dif)
+            else:
+                sigma1 = 0.33
+                sigma2 = 0.33
+            t_prob = sigma1
+            b_prob = sigma2
+            m_prob = 1 - sigma1 - sigma2
+            split1 = 1000 * sigma1
+            split2 = 1000 * (sigma1 + sigma2)
+            rand = randint(0, 1001)
+            if rand < split1:
+                return dynamic_road
+            if rand < split2:
+                return static_road
+            else:
+                return middle_road
+            if dynamic_road_time == 0 or static_road_time == 0:
+                return middle_road
+            if not SimEngine.gui_get(middle_on):
+                if agents_on_dynamic_road == 0 or agents_on_static_road == 0:
+                    return choice([dynamic_road, static_road])
+                t_dif = 2 - int(dynamic_road_time) ^ int(SimEngine.gui_get(randomness) / 10)
+                b_dif = 2 - int(static_road_time) ^ int(SimEngine.gui_get(randomness) / 10)
+                sigma = t_dif / (t_dif + b_dif)
+                t_prob = sigma
+                b_prob = 1 - sigma
+                split = 1000 * sigma
+                if randint(0, 1001) < split:
+                    return dynamic_road
+                else:
+                    return static_road
 
 # GUI
 
@@ -478,15 +480,14 @@ commuters_static = 'On Static Route:'
 commuters_dynamic = 'On Dynamic Route:'
 commuters_middle = 'On Braess Route:'
 
+top_time = 'Top Ticks:'
+avg_time = 'Average Ticks:'
+
 braess_left_upper = [
     [sg.Checkbox('Middle On?', default=True, key='middle_on', enable_events=True)],
 
     [sg.Text(spawn_rate, pad=((0,0),(15,0))),
      sg.Slider(key='spawn_rate', range=(1, 50), resolution=1, default_value=10,
-               orientation='horizontal', size=(10, 20))],
-
-    [sg.Text(smoothing, pad=((0, 0), (20, 0))),
-     sg.Slider(key='smoothing', range=(1, 10), resolution=1, default_value=1,
                orientation='horizontal', size=(10, 20))],
 
     [sg.Text(mode, pad=((0, 0), (20, 0))),
@@ -517,7 +518,10 @@ braess_right_upper = [
      sg.Text(commuters_static),
      sg.Text(0, key='nbr_commuters_static', size=(4, 0)),
      sg.Text(commuters_middle),
-     sg.Text(0, key='nbr_commuters_middle', size=(4, 0))]
+     sg.Text(0, key='nbr_commuters_middle', size=(4, 0))],
+
+    [sg.Text(top_time),
+     sg.Text(0, key='top', size=(6,0))]
 ]
 
 if __name__ == '__main__':
