@@ -6,26 +6,26 @@ from random import choice, randint, shuffle
 from typing import List
 
 from core.ga import Chromosome, GA_World, Individual, gui_left_upper
-from core.sim_engine import SimEngine
+from core.sim_engine import gui_get, gui_set
 
 
 class Item:
     """ These are the items from which to select. """
 
     def __init__(self, value, weight):
-        super().__init__()
         self.value = value
         self.weight = weight
 
     def __str__(self):
-        return f'{(self.value, self.weight)}'
+        return f'{self.value}/{self.weight}'
     
     
 class Knapsack_Problem:
     
-    # Every problem is a tuple: (capacity, items)
-    # problems is a dictionary of problems. (So far, only one problem.)
-    # problem 1 is the example from the reading.
+    # Every problem is a tuple: (capacity, items, solution (if known))
+
+    # problems is a dictionary of problems.
+    # Problem 1 is the example from the reading.
     problems = {'Problem 1': {'capacity': 9,
                               'items': [Item(6, 2), Item(5, 3), Item(8, 6), Item(9, 7),
                                         Item(6, 5), Item(7, 9), Item(3, 4)],
@@ -49,24 +49,37 @@ class Knapsack_Problem:
                               'items': [Item(350, 25), Item(400, 35), Item(450, 45), Item(20, 5),
                                         Item(70, 25), Item(8, 3), Item(5, 2), Item(5, 2), ],
                               'solution': '10111011'},
-
+                'Problem 7': {'capacity': 15,
+                              'items': [Item(5, 2), Item(12, 5), Item(7, 3), Item(9, 4), Item(12, 6),
+                                        Item(14, 7), Item(6, 3), ],
+                              'solution': '0111001'},
+                'Random': None,
                 }
     problem_names = list(problems.keys())
     
     def __init__(self, problem_name):
         problem = Knapsack_Problem.problems[problem_name]
-        self.capacity = problem['capacity']
-        items = problem['items']
+        self.capacity = randint(10, 1000) if problem is None else problem['capacity']
+        items = [Item(randint(1, 100), randint(1, 100)) for _ in range(randint(5, 50))] if problem is None else \
+                problem['items']
         # Sort the items by density
-        self.items = sorted(items, key=lambda item: item.value/item.weight, reverse=True)
-        self.solution = problem['solution']
+        self.items = sorted(items, key=lambda item: item.value / item.weight, reverse=True)
         self.fitness_target = self.maximum_fitness_target()
+        self.solution = f'<{self.fitness_target}>' if problem is None else problem['solution']
 
     def __str__(self):
-        chromo = None if self.solution is None else [int(i) for i in self.solution]
-        return f'\n  capacity: {self.capacity}\n' \
-               f'  items(value, weight)): {", ".join([str(item) for item in self.items])}\n' \
-               f'  solution: {None if chromo is None else Knapsack_Individual(chromo)}'
+        chromo = None if self.solution.startswith('<') else [int(i) for i in self.solution]
+        return f'\n  Capacity: {self.capacity}\n' \
+               f'  Items in density order (value/weight): {", ".join([str(item) for item in self.items])}\n' \
+               f'  Solution: {self.solution if chromo is None else Knapsack_Individual(chromo)}'
+
+    def generate_random_problem(self):
+        self.capacity = randint(10, 1000)
+        nbr_items = randint(5, 50)
+        items = [Item(randint(1, 100), randint(1, 100)) for _ in range(nbr_items)]
+        self.items = sorted(items, key=lambda item: item.value/item.weight, reverse=True)
+        self.solution = None
+        self.fitness_target = self.maximum_fitness_target()
 
     def maximum_fitness_target(self):
         total_value = 0
@@ -82,20 +95,16 @@ class Knapsack_Problem:
                 total_value += item.value*pct_of_last
                 total_weight += item.weight*pct_of_last
                 break
-        # avg_density = total_value / total_weight
-        # GA_World.fitness_target = floor(avg_density * capacity)
         fitness_target = floor(total_value)
         return fitness_target
-        # print(total_value, total_weight, capacity, GA_World.fitness_target)
 
 
 
 class Knapsack_Chromosome(Chromosome):
     """
-    An individual consists primarily of a sequence of Genes, called
-    a chromosome. We create a class for it simply because it's a
-    convenient place to store methods.
-
+    A Knapsack_Chromosome is a sequence of 1 and 0. Each position corresponds to one of the items
+    in the problem. If the entry in position i is 1, the Individual is selcting that item. If
+    it's 0, the Individual is not selecting that item.
     """
 
     def __str__(self):
@@ -132,7 +141,7 @@ class Knapsack_Individual(Individual):
 
     def mutate(self) -> Individual:
 
-        if randint(0, 100) <= SimEngine.gui_get('invert selection'):
+        if randint(0, 100) <= gui_get('invert selection'):
             new_chromosome = self.chromosome.invert_a_gene()
             new_individual = GA_World.individual_class(new_chromosome)
             return new_individual
@@ -140,15 +149,22 @@ class Knapsack_Individual(Individual):
             return self
 
     def trim_chromosome(self):
+        """ If the chromosome exceeds the problem capacity, remove items at random until it fits. """
         capacity = Knapsack_World.problem.capacity
         items = Knapsack_World.problem.items
         chromosome = self.chromosome
         self.total_weight = sum([chromosome[i] * items[i].weight for i in range(len(chromosome))])
         if self.total_weight <= capacity:
             return
+
+        # Indices of selected items
         selected_indices = [i for i in range(len(chromosome)) if chromosome[i]]
-        chromo_list = list(chromosome)
+
+        # shuffle reorders its argument randomly.
+        # (It's not functional. It changes its argument.)
         shuffle(selected_indices)
+
+        chromo_list = list(chromosome)
         for i in selected_indices:
             self.total_weight -= items[i].weight
             chromo_list[i] = 0
@@ -162,15 +178,11 @@ class Knapsack_World(GA_World):
     # problem is the user-selected problem
     problem: Knapsack_Problem = None
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.cycle_length = SimEngine.gui_get('cycle_length')
-
-    def gen_individual(self):
+    @staticmethod
+    def gen_individual():
         # A Chromosome has as many positions as the problem has items.
-        chromosome_list: List = [choice([0, 1]) for _ in range(len(Knapsack_World.problem.items))]
-        chromosome = Knapsack_Chromosome(chromosome_list)
-        individual = Knapsack_Individual(chromosome)
+        chromosome_list: List[int] = [choice([0, 1]) for _ in range(len(Knapsack_World.problem.items))]
+        individual = Knapsack_Individual(chromosome_list)
         return individual
 
     def set_results(self):
@@ -185,15 +197,19 @@ class Knapsack_World(GA_World):
         GA_World.individual_class = Knapsack_Individual
         GA_World.chromosome_class = Knapsack_Chromosome
 
-        problem_name = SimEngine.gui_get('Problem')
+        problem_name = gui_get('Problem')
         Knapsack_World.problem = Knapsack_Problem(problem_name)
         fitness_target = Knapsack_World.problem.fitness_target
-        SimEngine.gui_set('fitness_target', value=f'{fitness_target}')
+        gui_set('fitness_target', value=fitness_target)
         GA_World.fitness_target = fitness_target
-        print(f'\nNew Problem: {Knapsack_World.problem}')
+        print(f'\n{problem_name}: {Knapsack_World.problem}')
 
-        SimEngine.gui_set('Max generations', value=50)
+        gui_set('Max generations', value=250)
         super().setup()
+
+    @staticmethod
+    def sort_population(population):
+        return sorted(population, key=lambda i: (i.fitness, -i.total_weight), reverse=True)
 
 
 # ############################################## Define GUI ############################################## #

@@ -1,3 +1,4 @@
+from __future__ import annotations
 
 from random import random, sample, uniform
 from typing import List, Tuple
@@ -8,18 +9,22 @@ from core.agent import Agent
 from core.ga import Chromosome, GA_World, Gene, Individual, gui_left_upper
 from core.link import Link
 from core.pairs import Velocity
-from core.sim_engine import SimEngine
+from core.sim_engine import gui_get, gui_set
 from core.world_patch_block import World
 
 
-class Loop_Agent(Agent):
+class Cycle_Agent(Agent):
 
     @property
     def label(self):
-        return str(self.x_y) if SimEngine.gui_get('show_positions') else None
+        """
+        label is defined as a getter. No parentheses needed.
+        Returns the position of the agent, i.e., the point
+        """
+        return str(self.x_y) if gui_get('show_positions') else None
 
 
-class Loop_Link(Link):
+class Cycle_Link(Link):
 
     @property
     def label(self):
@@ -27,17 +32,16 @@ class Loop_Link(Link):
         label is defined as a getter. No parentheses needed.
         Returns the length of the link.
         """
-        return str(round(self.agent_1.distance_to(self.agent_2), 1)) if SimEngine.gui_get('show_lengths') else None
+        return str(round(self.agent_1.distance_to(self.agent_2), 1)) if gui_get('show_lengths') else None
 
 
-class Loop_Chromosome(Chromosome):
+class Cycle_Chromosome(Chromosome):
     """
     An individual consists primarily of a sequence of Genes, called
     a chromosome. We create a class for it simply because it's a
     convenient place to store methods.
 
     """
-
     def add_gene_to_chromosome(self, orig_fitness: float, gene: Gene) -> Tuple[Chromosome, int, float]:
         """ Add gene to the chromosome to minimize the resulting discrepancy. """
         (best_new_chrom, best_new_fitness, best_new_discr) = (None, None, None)
@@ -60,9 +64,13 @@ class Loop_Chromosome(Chromosome):
 
     def link_chromosome(self):
         for i in range(len(self)):
-            Loop_Link(self[i], self[(i+1) % len(self)])
+            Cycle_Link(self[i], self[(i+1) % len(self)])
 
     def replace_gene_in_chromosome(self, original_fitness: float) -> Chromosome:
+        """
+        Select a random gene and replace it with another (or the same) gene. Put
+        the replacement at the point in the chromosome that will produce the best result.
+        """
         (best_new_chrom, best_new_fitness, best_new_discr) = (None, None, None)
         len_chrom = len(self)
         for i in sample(range(len_chrom), min(3, len_chrom)):
@@ -74,22 +82,22 @@ class Loop_Chromosome(Chromosome):
             fitness_after_removal = original_fitness - gene_before.distance_to(removed_gene) \
                                                      - removed_gene.distance_to(gene_after)  \
                                                      + gene_before.distance_to(gene_after)
+
             # Make the removed gene not available because we will add it in explicitly 3 lines down.
             available_genes = GA_World.gene_pool - set(self)
             sample_size = min(len(available_genes), 5)  # if len_chrom == 2 else 4)
             # Include the removed gene as one of the ones to try.
             sampled_available_genes = sample(available_genes, sample_size) + [self[i]]
+
             # Don't want i_p_1 here since if i is the the last position, i_p_1 is 0,
             # and we would then be adding the entire chromosome back in a second time.
-            partial_chromosome: Loop_Chromosome = Loop_Chromosome(self[:i] + self[i+1:])
+            partial_chromosome: Cycle_Chromosome = Cycle_Chromosome(self[:i] + self[i+1:])
             for gene in sampled_available_genes:
                 (new_chrom, new_fitness, new_discr) = \
                     partial_chromosome.add_gene_to_chromosome(fitness_after_removal, gene)
                 if not best_new_discr or new_discr < best_new_discr:
                     (best_new_chrom, best_new_fitness, best_new_discr) = (new_chrom, new_fitness, new_discr)
 
-        # if GA_World.best_ind.discrepancy != GA_World.best_discr:
-        #     print('replace after loop', round(GA_World.best_discr, 5), round(GA_World.best_ind.discrepancy, 5))
         return best_new_chrom
 
     def trial_insertion(self, current_fitness: float, pos: int, new_gene: Gene) -> Tuple[Chromosome, int, float]:
@@ -112,13 +120,14 @@ class Loop_Chromosome(Chromosome):
 
 
 # noinspection PyTypeChecker
-class Loop_Individual(Individual):
+class Cycle_Individual(Individual):
 
     def __str__(self):
         return f'{self.fitness}: {[str(gene) for gene in self.chromosome]}'
 
     def compute_fitness(self) -> float:
-        fitness = self.chromosome.chromosome_fitness()
+        fitness = (self.chromosome).chromosome_fitness()
+        # print(fitness)
         return fitness
 
     def mate_with(self, other):
@@ -126,95 +135,90 @@ class Loop_Individual(Individual):
         return children
 
     def mutate(self) -> Individual:
-        chromosome: Chromosome = self.chromosome
-        # if randint(0, 100) <= SimEngine.gui_get('replace_gene'):
-        new_chromosome = chromosome.replace_gene_in_chromosome(self.fitness)
-        # if GA_World.best_ind.discrepancy != GA_World.best_discr:
-        #     print('mutate after replace_gene', round(GA_World.best_discr, 5), round(GA_World.best_ind.discrepancy, 5))
-        # else:
-        #     return self
-
+        new_chromosome = (self.chromosome).replace_gene_in_chromosome(self.fitness)
         new_individual = GA_World.individual_class(new_chromosome)
         return new_individual
 
 
-class Loop_World(GA_World):
+class Cycle_World(GA_World):
     
+    cycle_length = None
+
     def __init__(self, *arga, **kwargs):
         super().__init__(*arga, **kwargs)
-        self.cycle_length = SimEngine.gui_get('cycle_length')
 
     def gen_gene_pool(self):
         # The gene_pool in this case are the point on the grid, which are agents.
-        nbr_points = SimEngine.gui_get('nbr_points')
+        nbr_points = gui_get('nbr_points')
         self.create_random_agents(nbr_points, color=Color('white'), shape_name='node', scale=1)
         GA_World.gene_pool = World.agents
         for agent in GA_World.gene_pool:
-            agent.set_velocity(Loop_World.random_velocity())
+            agent.set_velocity(Cycle_World.random_velocity())
 
-    def gen_individual(self):
-        chromosome_list: List = sample(GA_World.gene_pool, self.cycle_length)
+    individuals = 0
+
+    @staticmethod
+    def gen_individual():
+        chromosome_list: List = sample(GA_World.gene_pool, Cycle_World.cycle_length)
+        Cycle_World.individuals += 1
         individual = GA_World.individual_class(GA_World.chromosome_class(chromosome_list))
         return individual
 
     def handle_event(self, event):
         if event == 'cycle_length':
-            new_cycle_length = SimEngine.gui_get('cycle_length')
-            if new_cycle_length != self.cycle_length:
-                self.cycle_length = SimEngine.gui_get('cycle_length')
+            new_cycle_length = gui_get('cycle_length')
+            if new_cycle_length != Cycle_World.cycle_length:
+                Cycle_World.cycle_length = gui_get('cycle_length')
                 # World.links = set()
                 self.best_ind = None
-                self.population = self.initial_population()
-                # super().setup()
+                self.gen_initial_population()
                 self.resume_ga()
             return
         super().handle_event(event)
 
     @staticmethod
-    def random_velocity(limit=0.05):
+    def random_velocity(limit=0.5):
         return Velocity((uniform(-limit, limit), uniform(-limit, limit)))
 
     def set_results(self):
         super().set_results()
         World.links = set()
-        best_chromosome = self.best_ind.chromosome
-
-        assert isinstance(best_chromosome, Loop_Chromosome)
+        best_chromosome: Cycle_Chromosome = self.best_ind.chromosome
         best_chromosome.link_chromosome()
         # Never stop
         self.done = False
 
     def setup(self):
-        GA_World.individual_class = Loop_Individual
-        GA_World.chromosome_class = Loop_Chromosome
-        SimEngine.gui_set('Max generations', value=float('inf'))
-        SimEngine.gui_set('pop_size', value=500)
-        SimEngine.gui_set('prob_random_parent', value=20)
-        self.cycle_length = SimEngine.gui_get('cycle_length')
+        GA_World.individual_class = Cycle_Individual
+        GA_World.chromosome_class = Cycle_Chromosome
+        Cycle_World.cycle_length = gui_get('cycle_length')
+        gui_set('Max generations', value=float('inf'))
+        gui_set('pop_size', value=100)
+        self.pop_size = 100
+        gui_set('prob_random_parent', value=20)
+        Cycle_World.cycle_length = gui_get('cycle_length')
         super().setup()
 
     def step(self):
         """
         Update the world by moving the agents.
         """
-        if SimEngine.gui_get('move_points'):
+        if gui_get('move_points'):
             for agent in GA_World.gene_pool:
                 agent.move_by_velocity()
                 if self.best_ind:
                     self.best_ind.fitness = self.best_ind.compute_fitness()
                 if random() < 0.0001:
-                    agent.set_velocity(Loop_World.random_velocity())
+                    agent.set_velocity(Cycle_World.random_velocity())
         super().step()
         # Never stop
         self.done = False
-        # if self.best_ind.discrepancy != self.best_discr:
-        #     print('step', round(self.best_discr, 3), round(self.best_ind.discrepancy, 3))
 
     def update_cycle_lengths(self, cycle_length):
         for ind in self.population:
             # To keep PyCharm's type checker happy
-            assert isinstance(ind.chromosome, Loop_Chromosome)
-            chromosome: Loop_Chromosome = ind.chromosome
+            assert isinstance(ind.chromosome, Cycle_Chromosome)
+            chromosome: Cycle_Chromosome = ind.chromosome
             if cycle_length < len(chromosome):
                 new_chromosome = chromosome[:cycle_length]
                 ind.fitness = ind.compute_fitness()
@@ -231,12 +235,8 @@ class Loop_World(GA_World):
 
 # ############################################## Define GUI ############################################## #
 import PySimpleGUI as sg
-loop_gui_left_upper = gui_left_upper + [
-                      # [sg.Text('Prob replace elt', pad=((0, 5), (20, 0))),
-                      #  sg.Slider(key='replace_gene', range=(0, 100), default_value=95,
-                      #            orientation='horizontal', size=(10, 20))
-                      #  ],
-                      #
+cycle_gui_left_upper = gui_left_upper + [
+
                       [sg.Text('Nbr points', pad=((0, 5), (10, 0))),
                        sg.Slider(key='nbr_points', range=(10, 200), default_value=100,
                                  orientation='horizontal', size=(10, 20))
@@ -248,7 +248,7 @@ loop_gui_left_upper = gui_left_upper + [
                        ],
 
                       [sg.Text('Cycle length', pad=(None, (20, 0))),
-                       sg.Slider(key='cycle_length', range=(2, 20), default_value=10, pad=((10, 0), (0, 0)),
+                       sg.Slider(key='cycle_length', range=(2, 50), default_value=10, pad=((10, 0), (0, 0)),
                                  orientation='horizontal', size=(10, 20), enable_events=True)
                        ],
 
@@ -264,4 +264,4 @@ loop_gui_left_upper = gui_left_upper + [
 if __name__ == "__main__":
     from core.agent import PyLogo
     # gui_left_upper is from core.ga
-    PyLogo(Loop_World, 'Closed paths', loop_gui_left_upper, agent_class=Loop_Agent)
+    PyLogo(Cycle_World, 'Closed paths', cycle_gui_left_upper, agent_class=Cycle_Agent, bounce=True)
