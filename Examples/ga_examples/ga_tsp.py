@@ -75,7 +75,54 @@ class TSP_Chromosome(Chromosome):
         Currently written to call random_path. You should replace that with an actual greedy algorithm.
         """
 
-        return TSP_Chromosome.random_path()
+        # Wilson's implementation of Greedy Algorithm
+        chromosome_list: List = sample(GA_World.gene_pool, 1)
+        # set the random gene as the current location of the salesman
+        gene = chromosome_list[0]
+        for agent in GA_World.gene_pool:
+            distances = []
+            # make sure the gene does not compare distance to itself
+            while agent not in chromosome_list:
+                # set an infinite value for best distance initially
+                best_distance = float('inf')
+                # calculate distance between current location and other cites
+                distance = gene.distance_to(agent)
+                distances.append(distance)
+                for distance in distances:
+                    if distance < best_distance:
+                        # takes the distance with the lowest value and sets that as the best distance
+                        best_distance = distance
+                        # next gene and initial gene set as the agent that gave the best value
+                        next_gene = agent
+                        gene = agent
+                        # next gene appends to chromosome list
+                        chromosome_list.append(next_gene)
+        return chromosome_list
+
+        # Stanley's implementation of Greedy Algorithm.
+        # randomized_pool = TSP_Chromosome.random_path()
+        # start_gene = randomized_pool.pop(0)
+        # greedy_path = []
+        #
+        # fringe = [start_gene]
+        #
+        # while fringe:
+        #     cur_gene: Agent = fringe.pop(0)
+        #     greedy_path.append(cur_gene)
+        #
+        #     min_dist = 99999
+        #     next_gene = None
+        #
+        #     for gene in [g for g in GA_World.gene_pool if g not in greedy_path]:
+        #         dist = cur_gene.distance_to(gene)
+        #         if dist < min_dist:
+        #             min_dist = dist
+        #             next_gene = gene
+        #
+        #     if next_gene:
+        #         fringe.append(next_gene)
+        #
+        # return greedy_path
 
     @staticmethod
     def random_path() -> List[Gene]:
@@ -98,7 +145,72 @@ class TSP_Chromosome(Chromosome):
         Constructs a minimum spanning tree. Then does a DFS of the tree, adding
         elements in the order encountered as long as they were not added earlier.
         """
-        return TSP_Chromosome.random_path()
+
+        # Using Prim's algorithm to construct MST
+        # Pick a random starting point
+        # We will use the same starting point for the DFS tour
+        start_gene = TSP_Chromosome.random_path()[0]
+
+        # Initialize list for mst
+        min_spanning_tree = []
+
+        # Initialize fringe with the random gene
+        fringe = [start_gene]
+
+        # Initialize a dictionary of neighbors with the key being the gene
+        # Value will be an empty list
+        mst_neighbors = {gene: [] for gene in GA_World.gene_pool}
+
+        # Start the search
+        while fringe:
+            # Pop the first element in the fringe and store it into cur_gene
+            cur_gene = fringe.pop(0)
+
+            # This serves as kind of a "visited" list.
+            # It shows the order in which we visited
+            min_spanning_tree.append(cur_gene)
+
+            # Min_dist is set to 99999 simply because no length in the GUI can reach over 99999.
+            min_dist = 99999
+            # Initialize next_gene so we know what to add to our fringe next.
+            # Next_gene is a tuple =
+            # (what we will append to the fringe next, where it came from)
+            gene_pair: Tuple = None
+
+            # Finds the smallest length link amongst all of the visited genes
+            # Doesn't evaluate links to any genes that have already been visited.
+            for visited_gene in min_spanning_tree:
+                # Find the minimum value link between the visited gene and unvisited genes.
+                for next_gene in [g for g in GA_World.gene_pool if g not in min_spanning_tree]:
+                    dist = visited_gene.distance_to(next_gene)
+                    if dist < min_dist:
+                        min_dist = dist
+                        gene_pair = (next_gene, visited_gene)
+
+            if gene_pair:
+                next_gene, parent_gene = gene_pair
+                # The next_gene is the gene that will be appended to the fringe next
+                # The parent gene (One we visited already) will have the next_gene as a neighbor.
+                mst_neighbors[parent_gene].append(next_gene)
+                fringe.append(next_gene)
+
+        # DFS of the MST
+        fringe = [start_gene]
+        visited = []
+
+        while fringe:
+            cur_gene = fringe.pop(0)
+            visited.append(cur_gene)
+
+            # Find the neighbors of the gene we are currently at
+            # It's neighbors will be defined by MST_Neighbors dictionary
+            neighbors = [gene for gene in mst_neighbors[cur_gene] if gene not in visited]
+            for n in neighbors:
+                # Insert to the top of the stack.
+                fringe.insert(0, n)
+
+        # The visited list will return a DFS tour based off of the MST.
+        return visited
 
 
 
@@ -178,7 +290,33 @@ class TSP_Chromosome(Chromosome):
 
         Currently calls move_gene_in_chromosome. Should be replaced with code that does two_opt.
         """
-        return self.move_gene_in_chromosome(original_fitness)
+
+        # Pick two random links that all have different agents.
+        random_links: List[Link] = sample(GA_World.links,2)
+        while (len({random_links[0].agent_1, random_links[0].agent_2, random_links[1].agent_1,
+                    random_links[1].agent_2}) != 4):
+            random_links = sample(GA_World.links,2)
+
+        ran_link_1 = random_links[0] # First link in the sample
+        ran_link_2 = random_links[1] # Second link in the sample
+
+        # Keep track of the agents and positions in the link before swap
+        link_1_before = (ran_link_1.agent_1, ran_link_1.agent_2)
+        link_2_before = (ran_link_2.agent_2, ran_link_2.agent_2)
+
+        # Swap the links
+        ran_link_1.agent_2 = ran_link_2.agent_2
+        ran_link_2.agent_2 = ran_link_1.agent_2
+
+        # Once the links are swapped, we can check to see if our fitness is any better.
+        # If it's not any better, then we set the links back to how it was beforehand
+        if not self.chromosome_fitness() > original_fitness:
+            ran_link_1.agent_2 = link_1_before[1]
+            ran_link_2.agent_2 = link_2_before[1]
+
+        # Return self (Since this is a TSP_Chromosome)
+        return self
+
 
 
 # noinspection PyTypeChecker
@@ -265,7 +403,7 @@ class TSP_World(GA_World):
             lnk.color = Color('red')
             World.links.add(lnk)
             SimEngine.draw_world()
-            sleep(0.60)
+            sleep(0.1)
 
     def gen_gene_pool(self):
         # The gene_pool in this case are the point on the grid, which are agents.
@@ -292,6 +430,7 @@ class TSP_World(GA_World):
         """
         Generate the initial population. gen_new_individual uses gen_individual from the subclass.
         """
+        print()
         # Must do it this way because self.gen_new_individual checks to see if each new individual
         # is already in self.population.
         self.population = []
