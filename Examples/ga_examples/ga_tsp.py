@@ -1,21 +1,24 @@
 from __future__ import annotations
 
+from inspect import getmembers
 from random import choice, random, sample, uniform
-from time import sleep
 from typing import List, Tuple
 
 from pygame import Color
 
+import core.gui as gui
 from core.agent import Agent
 from core.ga import Chromosome, GA_World, Gene, Individual, gui_left_upper
-from core.link import Link
+from core.link import Link, minimum_spanning_tree
 from core.pairs import Velocity
-from core.sim_engine import gui_get, gui_set, SimEngine
+from core.sim_engine import draw_links, gui_get, gui_set, SimEngine
 from core.world_patch_block import World
 
 
 class TSP_Agent(Agent):
     """ An agent is a point on the screen, not a GA individual. """
+
+    show_labels = False
 
     def __lt__(self, other):
         return self.id < other.id
@@ -29,7 +32,7 @@ class TSP_Agent(Agent):
         label is defined as a getter. No parentheses needed.
         Returns the position of the agent, i.e., the point
         """
-        return str(self.id) if gui_get('show_labels') else None
+        return str(self.id) if TSP_Agent.show_labels else None
 
 
 class TSP_Link(Link):
@@ -40,7 +43,7 @@ class TSP_Link(Link):
         label is defined as a getter. No parentheses needed.
         Returns the length of the link.
         """
-        return str(round(self.agent_1.distance_to(self.agent_2), 1)) if gui_get('show_lengths') else None
+        return str(self.length) if gui_get('show_lengths') else None
 
 
 class TSP_Chromosome(Chromosome):
@@ -365,6 +368,10 @@ class TSP_Individual(Individual):
 
 class TSP_World(GA_World):
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.msp_links = None
+
     def create_node(self):
         new_point = self.create_random_agent(color=Color('white'), shape_name='node', scale=1)
         new_point.set_velocity(TSP_World.random_velocity())
@@ -396,15 +403,6 @@ class TSP_World(GA_World):
                 updated_chromos.add(new_chromo)
         node.delete()
 
-    @staticmethod
-    def draw_world(links):
-        World.links = set()
-        for lnk in links:
-            lnk.color = Color('red')
-            World.links.add(lnk)
-            SimEngine.draw_world()
-            sleep(0.1)
-
     def gen_gene_pool(self):
         # The gene_pool in this case are the point on the grid, which are agents.
         nbr_points = gui_get('nbr_points')
@@ -430,7 +428,6 @@ class TSP_World(GA_World):
         """
         Generate the initial population. gen_new_individual uses gen_individual from the subclass.
         """
-        print()
         # Must do it this way because self.gen_new_individual checks to see if each new individual
         # is already in self.population.
         self.population = []
@@ -439,9 +436,17 @@ class TSP_World(GA_World):
             new_individual = self.gen_new_individual()
             assert isinstance(new_individual, TSP_Individual)
             assert isinstance(new_individual.chromosome, TSP_Chromosome)
-            if 'random_path' not in str(new_individual.generator):
-                links = new_individual.chromosome.link_chromosome()
-                TSP_World.draw_world(links)
+            generator_name = dict(getmembers(new_individual.generator))['__name__']
+            if gui_get('Animate construction'):
+                print(f'{i}. {generator_name} {"(no display)" if generator_name == "random_path" else ""}')
+            if generator_name != 'random_path':
+                msp_links = self.minimum_spanning_tree_links() if generator_name == 'spanning_tree_path' else []
+                path_links = new_individual.chromosome.link_chromosome()
+                if gui_get('Animate construction'):
+                    for lnk in path_links:
+                        lnk.set_color(Color('red'))
+                    World.links = set()
+                    draw_links(msp_links + path_links, World.links)
             self.population.append(new_individual)
 
     def handle_event(self, event):
@@ -451,25 +456,25 @@ class TSP_World(GA_World):
             elif event == 'Delete Node':
                 if len(GA_World.gene_pool) > 2:
                     self.delete_node()
-            gui_set('nbr_points', value=len(self.gene_pool))
-            self.best_ind = None
+            gui_set('nbr_points', value=len(GA_World.gene_pool))
             self.set_results()
         elif event == 'Reverse':
-            for gene in self.gene_pool:
+            for gene in GA_World.gene_pool:
                 gene.velocity *= (-1)
-        elif event == 'Animate path construction':
-            self.best_ind = None
-            gui_set('move points', value=False)
         else:
             super().handle_event(event)
 
+    def minimum_spanning_tree_links(self):
+        if not self.msp_links:
+            self.msp_links = minimum_spanning_tree(list(GA_World.gene_pool))
+        return self.msp_links
+
     @staticmethod
-    def random_velocity(limit=1):
+    def random_velocity(limit=0.75):
         return Velocity((uniform(-limit, limit), uniform(-limit, limit)))
 
     def set_results(self):
         super().set_results()
-        # World.links = set()
         best_chromosome: TSP_Chromosome = self.best_ind.chromosome
         World.links = set(best_chromosome.link_chromosome())
 
@@ -480,24 +485,43 @@ class TSP_World(GA_World):
         Agent.id = 1
         GA_World.individual_class = TSP_Individual
         GA_World.chromosome_class = TSP_Chromosome.factory
+
         # The following GUI elements are defined in ga.py.
         # We can't set their default values in this file's GUI.
+        # The only way to do it is explicitly.
         gui_set('Max generations', value=float('inf'))
         gui_set('pop_size', value=20)
         gui_set('prob_random_parent', value=20)
 
         # Don't display the following standard GA features.
-        gui_set('Discrep:', visible=False)
-        gui_set('discrepancy', visible=False)
-        gui_set('Gens:', visible=False)
-        gui_set('generations', visible=False)
+        for label in ['Discrep:', 'discrepancy', 'Gens:', 'generations']:
+            gui_set(label, visible=False)
 
-        super().setup()
+        TSP_Agent.show_labels = gui_get('show_labels')
+
+        (SimEngine.event, SimEngine.values) = gui.WINDOW.read(timeout=10)
+        SimEngine.draw_world()
+
+        # auto_setup is initially True (by default). The next line aborts setup in that case.
+        # The purpose is to allow the system to create a display but not run gen_population,
+        # which is run when the user clicks setup. That works because auto_setup is set to
+        # False by SimEngine after setup run, which happens automatically. So, if auto_setup
+        # is False, we will complete setup and generate the initial population.
+        if not SimEngine.auto_setup:
+            self.msp_links = None
+            if gui_get('Animate construction'):
+                print(f'\nGenerating the initial population of {gui_get("pop_size")} paths.')
+            super().setup()
 
     def step(self):
         """
         Update the world by moving the agents.
         """
+        # If the user hadn't clicked setup before clicking go, the
+        # gene_pool will not have been generated. The following
+        # call to setup replaces the user clicking setup.
+        if GA_World.gene_pool is None:
+            self.setup()
         if gui_get('move points'):
             for agent in GA_World.gene_pool:
                 agent.move_by_velocity()
@@ -506,6 +530,7 @@ class TSP_World(GA_World):
             for ind in self.population:
                 ind.fitness = ind.compute_fitness()
             self.best_ind = None
+        TSP_Agent.show_labels = gui_get('show_labels')
         super().step()
 
 
@@ -530,9 +555,9 @@ tsp_right_upper = [[
                     sg.Frame('Node control', frame_layout_node_buttons, pad=((25, 0), (0, 0))),
                     ]]
 
-path_controls = [[sg.Checkbox('Move points', key='move points', pad=(None, (10, 0)), default=True)],
-                  # sg.Checkbox('Animate construction', key='Animate path construction', pad=((20, 0), (10, 0)),
-                  #             default=True, enable_events=True)],
+path_controls = [[sg.Checkbox('Move points', key='move points', pad=(None, (10, 0)), default=True),
+                  sg.Checkbox('Animate construction', key='Animate construction', pad=((20, 0), (10, 0)),
+                              default=True, enable_events=True)],
 
                  [sg.Checkbox('Show labels', key='show_labels', default=True, pad=((0, 0), (10, 0))),
                   sg.Checkbox('Show lengths', key='show_lengths', default=False, pad=((20, 0), (10, 0)))]
@@ -552,4 +577,4 @@ tsp_gui_left_upper = gui_left_upper + [
 if __name__ == "__main__":
     from core.agent import PyLogo
     PyLogo(TSP_World, 'TSP', tsp_gui_left_upper, gui_right_upper=tsp_right_upper,
-           agent_class=TSP_Agent, bounce=True, auto_setup=False)
+           agent_class=TSP_Agent, bounce=True)

@@ -211,8 +211,7 @@ class GA_World(World):
         # Must do it this way because self.gen_new_individual checks to see if each new individual
         # is already in self.population.
         self.population = []
-        for i in range(self.pop_size):
-            print(i)
+        for _ in range(self.pop_size):
             self.population.append(self.gen_new_individual())
 
     def gen_new_individual(self) -> Individual:
@@ -301,15 +300,16 @@ class GA_World(World):
             self.done = True
 
     def setup(self):
-        World.agents = set()
-        # Create a list of Individuals as the initial population.
-        self.gen_gene_pool()
+        if not World.agents:
+            World.agents = set()
+            self.gen_gene_pool()
 
         # self.pop_size must be even since we generate children two at a time.
-        # It may not be None if it was set by the specific problem's setup function.
+        # If it was set by the specific problem's setup function, it will not be None.
         if self.pop_size is None:
             self.pop_size = gui_get('pop_size')
 
+        # Create the initial population of individuals.
         self.gen_initial_population()
 
         self.tournament_size = gui_get('tourn_size')
