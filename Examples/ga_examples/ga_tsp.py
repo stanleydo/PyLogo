@@ -79,53 +79,55 @@ class TSP_Chromosome(Chromosome):
         """
 
         # Wilson's implementation of Greedy Algorithm
-        chromosome_list: List = sample(GA_World.gene_pool, 1)
-        # set the random gene as the current location of the salesman
-        gene = chromosome_list[0]
-        for agent in GA_World.gene_pool:
-            distances = []
-            # make sure the gene does not compare distance to itself
-            while agent not in chromosome_list:
-                # set an infinite value for best distance initially
-                best_distance = float('inf')
-                # calculate distance between current location and other cites
-                distance = gene.distance_to(agent)
-                distances.append(distance)
-                for distance in distances:
-                    if distance < best_distance:
-                        # takes the distance with the lowest value and sets that as the best distance
-                        best_distance = distance
-                        # next gene and initial gene set as the agent that gave the best value
-                        next_gene = agent
-                        gene = agent
-                        # next gene appends to chromosome list
-                        chromosome_list.append(next_gene)
-        return chromosome_list
+        # chromosome_list: List = sample(GA_World.gene_pool, 1)
+        # # set the random gene as the current location of the salesman
+        # gene = chromosome_list[0]
+        # for agent in GA_World.gene_pool:
+        #     distances = []
+        #     # make sure the gene does not compare distance to itself
+        #     while agent not in chromosome_list:
+        #         # set an infinite value for best distance initially
+        #         best_distance = float('inf')
+        #         # calculate distance between current location and other cites
+        #         distance = gene.distance_to(agent)
+        #         distances.append(distance)
+        #         for distance in distances:
+        #             if distance < best_distance:
+        #                 # takes the distance with the lowest value and sets that as the best distance
+        #                 best_distance = distance
+        #                 # next gene and initial gene set as the agent that gave the best value
+        #                 next_gene = agent
+        #                 gene = agent
+        #                 # next gene appends to chromosome list
+        #                 chromosome_list.append(next_gene)
+        # return chromosome_list
 
         # Stanley's implementation of Greedy Algorithm.
-        # randomized_pool = TSP_Chromosome.random_path()
-        # start_gene = randomized_pool.pop(0)
-        # greedy_path = []
-        #
-        # fringe = [start_gene]
-        #
-        # while fringe:
-        #     cur_gene: Agent = fringe.pop(0)
-        #     greedy_path.append(cur_gene)
-        #
-        #     min_dist = 99999
-        #     next_gene = None
-        #
-        #     for gene in [g for g in GA_World.gene_pool if g not in greedy_path]:
-        #         dist = cur_gene.distance_to(gene)
-        #         if dist < min_dist:
-        #             min_dist = dist
-        #             next_gene = gene
-        #
-        #     if next_gene:
-        #         fringe.append(next_gene)
-        #
-        # return greedy_path
+        randomized_pool = TSP_Chromosome.random_path()
+        start_gene = randomized_pool.pop(0)
+        greedy_path = [start_gene]
+
+        available_genes = [g for g in GA_World.gene_pool if g not in greedy_path]
+
+        while available_genes:
+            cur_gene: Agent = greedy_path[-1]
+
+            min_dist = 99999
+            next_gene = None
+
+            for gene in available_genes:
+                dist = cur_gene.distance_to(gene)
+                if dist < min_dist:
+                    min_dist = dist
+                    next_gene = gene
+
+            greedy_path.append(next_gene)
+
+            available_genes = [g for g in GA_World.gene_pool if g not in greedy_path]
+
+        print([agent.id for agent in greedy_path])
+
+        return greedy_path
 
     @staticmethod
     def random_path() -> List[Gene]:
@@ -197,6 +199,13 @@ class TSP_Chromosome(Chromosome):
                 mst_neighbors[parent_gene].append(next_gene)
                 fringe.append(next_gene)
 
+        new_msp_links = []
+        for parent_gene in mst_neighbors.keys():
+            for neighbor in mst_neighbors[parent_gene]:
+                new_msp_links.append(TSP_Link(parent_gene, neighbor, add_to_world_links=False, color=Color('green'), width=2))
+
+        TSP_World.msp_links = new_msp_links
+
         # DFS of the MST
         fringe = [start_gene]
         visited = []
@@ -214,7 +223,6 @@ class TSP_Chromosome(Chromosome):
 
         # The visited list will return a DFS tour based off of the MST.
         return visited
-
 
 
     def add_gene_to_chromosome(self, orig_fitness: float, gene):
@@ -244,7 +252,7 @@ class TSP_Chromosome(Chromosome):
         links = []
         if len(self) > 1:
             for i in range(len(self)):
-                lnk = TSP_Link(self[i], self[(i+1) % len(self)])
+                lnk = TSP_Link(self[i], self[(i+1) % len(self)], width=3)
                 links.append(lnk)
         return links
 
@@ -422,7 +430,7 @@ class TSP_World(GA_World):
         chromosome_list: List = gen_path_method()
         chromo = GA_World.chromosome_class(chromosome_list)
         individual = GA_World.individual_class(chromo, generator=gen_path_method)
-        return individual
+        return (individual, chromosome_list)
 
     def gen_initial_population(self):
         """
@@ -433,7 +441,7 @@ class TSP_World(GA_World):
         self.population = []
         for i in range(self.pop_size):
             print(i, end='. ')
-            new_individual = self.gen_new_individual()
+            new_individual, chromosome_list = self.gen_individual()
             assert isinstance(new_individual, TSP_Individual)
             assert isinstance(new_individual.chromosome, TSP_Chromosome)
             generator_name = dict(getmembers(new_individual.generator))['__name__']
