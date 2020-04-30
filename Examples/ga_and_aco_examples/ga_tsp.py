@@ -9,7 +9,7 @@ from pygame import Color
 import core.gui as gui
 from core.agent import Agent
 from core.ga import Chromosome, GA_World, Gene, Individual, gui_left_upper
-from core.link import Link, minimum_spanning_tree
+from core.link import Link, minimum_spanning_tree, seq_to_links
 from core.pairs import Velocity
 from core.sim_engine import draw_links, gui_get, gui_set, SimEngine
 from core.world_patch_block import World
@@ -333,9 +333,10 @@ class TSP_Chromosome(Chromosome):
 # noinspection PyTypeChecker
 class TSP_Individual(Individual):
 
-    def __init__(self, *args, generator=None, **kwargs):
+    def __init__(self, *args, generator=None, original_sequence=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.generator = generator
+        self.original_sequence = original_sequence
 
     def __str__(self):
         return f'{round(self.fitness, 1)}: ({", ".join([str(gene) for gene in self.chromosome])})'
@@ -429,8 +430,8 @@ class TSP_World(GA_World):
         gen_path_method = choice(path_methods)
         chromosome_list: List = gen_path_method()
         chromo = GA_World.chromosome_class(chromosome_list)
-        individual = GA_World.individual_class(chromo, generator=gen_path_method)
-        return (individual, chromosome_list)
+        individual = GA_World.individual_class(chromo, generator=gen_path_method, original_sequence=chromosome_list)
+        return individual
 
     def gen_initial_population(self):
         """
@@ -440,8 +441,7 @@ class TSP_World(GA_World):
         # is already in self.population.
         self.population = []
         for i in range(self.pop_size):
-            print(i, end='. ')
-            new_individual, chromosome_list = self.gen_individual()
+            new_individual = self.gen_new_individual()
             assert isinstance(new_individual, TSP_Individual)
             assert isinstance(new_individual.chromosome, TSP_Chromosome)
             generator_name = dict(getmembers(new_individual.generator))['__name__']
@@ -449,10 +449,10 @@ class TSP_World(GA_World):
                 print(f'{i}. {generator_name} {"(no display)" if generator_name == "random_path" else ""}')
             if generator_name != 'random_path':
                 msp_links = self.minimum_spanning_tree_links() if generator_name == 'spanning_tree_path' else []
-                path_links = new_individual.chromosome.link_chromosome()
+                path_links = seq_to_links(new_individual.original_sequence, TSP_Link)
                 if gui_get('Animate construction'):
                     for lnk in path_links:
-                        lnk.set_color(Color('red'))
+                        lnk.set_color(Color('yellow' if lnk in msp_links else 'red'))
                     World.links = set()
                     draw_links(msp_links + path_links, World.links)
             self.population.append(new_individual)
@@ -484,7 +484,7 @@ class TSP_World(GA_World):
     def set_results(self):
         super().set_results()
         best_chromosome: TSP_Chromosome = self.best_ind.chromosome
-        World.links = set(best_chromosome.link_chromosome())
+        World.links = set(seq_to_links(best_chromosome, TSP_Link))
 
         # Never stop
         self.done = False
@@ -498,7 +498,6 @@ class TSP_World(GA_World):
         # We can't set their default values in this file's GUI.
         # The only way to do it is explicitly.
         gui_set('Max generations', value=float('inf'))
-        gui_set('pop_size', value=20)
         gui_set('prob_random_parent', value=20)
 
         # Don't display the following standard GA features.

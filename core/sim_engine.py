@@ -208,6 +208,8 @@ def draw_links(links, world_links_set):
             SimEngine.draw_world()
         if not paused:
             lnk = links.pop(0)
+            if lnk in world_links_set:
+                world_links_set.remove(lnk)
             world_links_set.add(lnk)
             SimEngine.draw_world()
         sleep(0.60)
@@ -236,4 +238,6 @@ def gui_set(key, **kwargs):
         kwargs['disabled'] = not bool(value)
         kwargs.pop('enabled')
     widget = gui.WINDOW[key]
+    if widget is None:
+        print(f'No widget with key {key}')
     widget.update(**kwargs)
