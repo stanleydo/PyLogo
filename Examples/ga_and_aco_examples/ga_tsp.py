@@ -9,10 +9,24 @@ from pygame import Color
 import core.gui as gui
 from core.agent import Agent
 from core.ga import Chromosome, GA_World, Gene, Individual, gui_left_upper
-from core.link import Link, minimum_spanning_tree, seq_to_links
+from core.link import draw_links, Link, minimum_spanning_tree, seq_to_links
 from core.pairs import Velocity
-from core.sim_engine import draw_links, gui_get, gui_set, SimEngine
+from core.sim_engine import gui_get, gui_set, SimEngine
 from core.world_patch_block import World
+
+
+def order_elements(elt_list):
+    """
+    Rotate and possibly reverse the elt_list so that city A comes first
+    and the city that follows city A is less than the city that precedes it.
+    """
+    first_index = min(range(len(elt_list)), key=lambda i: elt_list[i])
+    # In the second case, must leave the end index as None. If set to -1, it will
+    # be taken as len(chromo)-1. The slice will produce the empty list.
+    revised = elt_list[first_index:] + elt_list[:first_index] \
+        if elt_list[(first_index + 1) % len(elt_list)] < elt_list[(first_index - 1)] else \
+        elt_list[first_index::-1] + elt_list[len(elt_list) - 1:first_index:-1]
+    return revised
 
 
 class TSP_Agent(Agent):
@@ -54,13 +68,8 @@ class TSP_Chromosome(Chromosome):
     """
     @staticmethod
     def factory(chromo):
-        first_index = min(range(len(chromo)), key=lambda i: chromo[i])
-        # In the second case, must leave the end index as None. If set to -1, it will
-        # be taken as len(chromo)-1. The slice will produce the empty list.
-        revised = chromo[first_index:] + chromo[:first_index] \
-                      if chromo[(first_index+1) % len(chromo)] < chromo[(first_index-1)] else \
-                  chromo[first_index::-1] + chromo[len(chromo)-1:first_index:-1]
-        new_chromo = TSP_Chromosome(revised)
+        ordered_chromo = order_elements(chromo)
+        new_chromo = TSP_Chromosome(ordered_chromo)
         return new_chromo
 
     def __str__(self):
@@ -204,26 +213,6 @@ class TSP_Chromosome(Chromosome):
             for neighbor in mst_neighbors[parent_gene]:
                 new_msp_links.append(TSP_Link(parent_gene, neighbor, add_to_world_links=False, color=Color('green'), width=2))
 
-        TSP_World.msp_links = new_msp_links
-
-        # DFS of the MST
-        fringe = [start_gene]
-        visited = []
-
-        while fringe:
-            cur_gene = fringe.pop(0)
-            visited.append(cur_gene)
-
-            # Find the neighbors of the gene we are currently at
-            # It's neighbors will be defined by MST_Neighbors dictionary
-            neighbors = [gene for gene in mst_neighbors[cur_gene] if gene not in visited]
-            for n in reversed(neighbors):
-                # Insert to the top of the stack.
-                fringe.insert(0, n)
-
-        # The visited list will return a DFS tour based off of the MST.
-        print([v.id for v in visited])
-        return visited
 
 
     def add_gene_to_chromosome(self, orig_fitness: float, gene):
@@ -248,14 +237,6 @@ class TSP_Chromosome(Chromosome):
         distances = [self[i].distance_to(self[(i + 1) % len_chrom]) for i in range(len_chrom)]
         fitness = sum(distances)
         return fitness
-
-    def link_chromosome(self):
-        links = []
-        if len(self) > 1:
-            for i in range(len(self)):
-                lnk = TSP_Link(self[i], self[(i+1) % len(self)], width=3)
-                links.append(lnk)
-        return links
 
     def move_gene_in_chromosome(self, original_fitness: float) -> TSP_Chromosome:
         """
@@ -449,8 +430,9 @@ class TSP_World(GA_World):
                 if gui_get('Animate construction'):
                     for lnk in path_links:
                         lnk.set_color(Color('yellow' if lnk in msp_links else 'red'))
-                    World.links = set()
-                    draw_links(msp_links + path_links, World.links)
+                    # World.links = set()
+                    # draw_links(msp_links + path_links, World.links)
+                    draw_links(msp_links + path_links)
             self.population.append(new_individual)
 
     def handle_event(self, event):
