@@ -11,7 +11,7 @@ from core.link import Link
 from core.pairs import Velocity
 from core.sim_engine import gui_get
 from core.world_patch_block import World
-from ga_and_aco_examples.ga_tsp import order_elements
+# from ga_and_aco_examples.ga_tsp import order_elements
 
 
 class ACO_Agent(Agent):

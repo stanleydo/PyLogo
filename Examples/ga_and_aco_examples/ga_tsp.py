@@ -217,11 +217,12 @@ class TSP_Chromosome(Chromosome):
             # Find the neighbors of the gene we are currently at
             # It's neighbors will be defined by MST_Neighbors dictionary
             neighbors = [gene for gene in mst_neighbors[cur_gene] if gene not in visited]
-            for n in neighbors:
+            for n in reversed(neighbors):
                 # Insert to the top of the stack.
                 fringe.insert(0, n)
 
         # The visited list will return a DFS tour based off of the MST.
+        print([v.id for v in visited])
         return visited
 
 
@@ -301,29 +302,24 @@ class TSP_Chromosome(Chromosome):
 
         Currently calls move_gene_in_chromosome. Should be replaced with code that does two_opt.
         """
+        # Pick 2 random points
+        points = sample(range(0, len(self)), 2)
+        while (points[0]+1 == points[1]):
+            points = sample(range(0, len(self)), 2)
 
-        # Pick two random links that all have different agents.
-        random_links: List[Link] = sample(GA_World.links,2)
-        while (len({random_links[0].agent_1, random_links[0].agent_2, random_links[1].agent_1,
-                    random_links[1].agent_2}) != 4):
-            random_links = sample(GA_World.links,2)
+        self_as_list = list(self)
+        original_self = self_as_list.copy()
 
-        ran_link_1 = random_links[0] # First link in the sample
-        ran_link_2 = random_links[1] # Second link in the sample
+        initial_internal_seq = self[points[0]+1:points[1]+1]
+        reversed_seq = reversed(initial_internal_seq)
 
-        # Keep track of the agents and positions in the link before swap
-        link_1_before = (ran_link_1.agent_1, ran_link_1.agent_2)
-        link_2_before = (ran_link_2.agent_2, ran_link_2.agent_2)
+        self_as_list[points[0]+1:points[1]+1] = list(reversed_seq)
 
-        # Swap the links
-        ran_link_1.agent_2 = ran_link_2.agent_2
-        ran_link_2.agent_2 = ran_link_1.agent_2
+        new_self = self_as_list
+        self = TSP_Chromosome(new_self)
 
-        # Once the links are swapped, we can check to see if our fitness is any better.
-        # If it's not any better, then we set the links back to how it was beforehand
-        if not self.chromosome_fitness() > original_fitness:
-            ran_link_1.agent_2 = link_1_before[1]
-            ran_link_2.agent_2 = link_2_before[1]
+        if not original_fitness < self.chromosome_fitness():
+            return TSP_Chromosome(original_self)
 
         # Return self (Since this is a TSP_Chromosome)
         return self

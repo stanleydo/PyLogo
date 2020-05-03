@@ -212,7 +212,7 @@ def draw_links(links, world_links_set):
                 world_links_set.remove(lnk)
             world_links_set.add(lnk)
             SimEngine.draw_world()
-        sleep(0.60)
+        sleep(0.01)
     gui_set(SimEngine.simple_gui.EXIT, enabled=True)
     gui_set(gui.GOSTOP, text='stop', button_color=('white', 'red'), enabled=True)
 
