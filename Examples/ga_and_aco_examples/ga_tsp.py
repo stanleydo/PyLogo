@@ -87,30 +87,6 @@ class TSP_Chromosome(Chromosome):
         Currently written to call random_path. You should replace that with an actual greedy algorithm.
         """
 
-        # Wilson's implementation of Greedy Algorithm
-        # chromosome_list: List = sample(GA_World.gene_pool, 1)
-        # # set the random gene as the current location of the salesman
-        # gene = chromosome_list[0]
-        # for agent in GA_World.gene_pool:
-        #     distances = []
-        #     # make sure the gene does not compare distance to itself
-        #     while agent not in chromosome_list:
-        #         # set an infinite value for best distance initially
-        #         best_distance = float('inf')
-        #         # calculate distance between current location and other cites
-        #         distance = gene.distance_to(agent)
-        #         distances.append(distance)
-        #         for distance in distances:
-        #             if distance < best_distance:
-        #                 # takes the distance with the lowest value and sets that as the best distance
-        #                 best_distance = distance
-        #                 # next gene and initial gene set as the agent that gave the best value
-        #                 next_gene = agent
-        #                 gene = agent
-        #                 # next gene appends to chromosome list
-        #                 chromosome_list.append(next_gene)
-        # return chromosome_list
-
         # Stanley's implementation of Greedy Algorithm.
         randomized_pool = TSP_Chromosome.random_path()
         start_gene = randomized_pool.pop(0)

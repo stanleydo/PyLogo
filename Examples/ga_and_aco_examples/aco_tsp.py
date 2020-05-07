@@ -1,6 +1,6 @@
 
 from copy import copy
-from random import random, uniform
+from random import random, uniform, choices
 from typing import List
 
 from pygame import Color
@@ -59,6 +59,12 @@ class ACO_Link(Link):
         # of which cities it is being used to link together.
         self.from_city = from_city
         self.to_city = to_city
+
+    def includes_one(self, agents):
+        for agent in agents:
+            if super().includes(agent):
+                return True
+        return False
 
     def __str__(self):
         return f'{self.from_city}-->{self.to_city}'
@@ -149,13 +155,44 @@ class ACO_World(GA_World):
         tour = []
         while unvisited_cities:
             """ You write the loop body. """
-            ...
+            # Get all the links that is connected to the current city that hasn't been visited
+            # Current_city is Tau_ij
+            valid_neighboring_links = [l for l in World.links if l.includes(current_city) and l.includes_one(unvisited_cities)]
+            next_link = None
+
+            if best:
+                next_link = (self.get_best_link_by_weight(valid_neighboring_links))
+            else:
+                link_probabilities = []
+                for link in valid_neighboring_links:
+                    # Pheromone intensity of my link
+                    tau_ij = link.pheromone_level ** alpha
+
+                    # Heuristic cost estimate
+                    eta_ij = (1/link.length) ** beta
+
+                    pheromone_sum = 0
+                    for inner_link in valid_neighboring_links:
+                        tau_ij_sum = inner_link.pheromone_level ** alpha
+                        eta_ij_sum = (1 / inner_link.length) ** beta
+                        pheromone_sum += tau_ij_sum * eta_ij_sum
+
+                    link_probabilities.append((tau_ij * eta_ij)/pheromone_sum)
+                next_link: ACO_Link = choices(population=valid_neighboring_links, weights=link_probabilities, k=1)[0]
+
+            tour.append(next_link)
+
+            next_link.from_city = current_city
+            current_city = next_link.other_side(current_city)
+            next_link.to_city = current_city
+
+            unvisited_cities = unvisited_cities - {current_city}
 
         """ 
         Don't forget the final link back to the start city. 
         DON'T create a new link. One already exists. Find it. 
         """
-        final_link = ...
+        final_link: ACO_Link = [l for l in ACO_World.links if l.includes(start_city) and l.includes(current_city)][0]
         tour.append(final_link)
 
         (final_link.from_city, final_link.to_city) = (current_city, start_city)
@@ -164,10 +201,18 @@ class ACO_World(GA_World):
             self.best_tour_length = tour_length
         return tour
 
+    def get_best_link_by_weight(self, valid_neighboring_links) -> ACO_Link:
+        links_and_distances = []
+        for link in valid_neighboring_links:
+            links_and_distances.append((link, 1/link.length))
+        shortest_link = max(links_and_distances, key=lambda x: x[1])[0]
+        return shortest_link
+
+
     def mark_best_tour(self):
         """ Mark the links in the best tour. """
         best_tour_links_list = [self.generate_a_tour(best=True) for _ in range(5)]
-        best_tour_links = min(best_tour_links_list, key=lambda tour: self.total_dist(tour) )
+        best_tour_links = min(best_tour_links_list, key=lambda tour: self.total_dist(tour))
         self.best_tour_length = round(self.total_dist(best_tour_links))
 
         city_sequence = [lnk.from_city for lnk in best_tour_links]
@@ -235,25 +280,38 @@ class ACO_World(GA_World):
         The following is an outline of what I did. You don't have to follow thay approach.
         """
 
-        # noinspection PyUnusedLocal
         tour_length = round(self.total_dist(tour))
 
-        # 'update increment step' is intended to limit the rate at
-        # which the pheromone level is permitted to approach 100.
-        def max_increment(lnk):
-            """ The maximum abount by which lnk's peromone level may increase due to one tour. """
-            return (100 - lnk.pheromone_level)*gui_get('update increment step')/100
+        # Quantity of ant pheromone laid by an ant.
+        p_quantity = gui_get('update increment step') * 2
 
-        # raw_increment is the computed amount by which this tour will increase
-        # the pheromone level of all its links.
+        # Residual ratio of the pheromone. Has to be < 1
+        rho = 0.95
+        for link in ACO_World.links:
+            # New pheromone is the residual ratio multiplied by the previous pheromone level
+            new_pheromone = rho * link.pheromone_level
+            if link in tour:
+                new_pheromone += p_quantity/tour_length
+            link.pheromone_level = new_pheromone
+
+        # # noinspection PyUnusedLocal
         #
-        # I made it a function of how the current tour compares to the curent best tour.
-        # 'update_weight' puts a weight on how much a good tour is considered important.
-
-        raw_increment = ...
-
-        for lnk in tour:
-            lnk.pheromone_level += min(max_increment(lnk), raw_increment)
+        # # 'update increment step' is intended to limit the rate at
+        # # which the pheromone level is permitted to approach 100.
+        # def max_increment(lnk):
+        #     """ The maximum abount by which lnk's peromone level may increase due to one tour. """
+        #     return (100 - lnk.pheromone_level)*gui_get('update increment step')/100
+        #
+        # # raw_increment is the computed amount by which this tour will increase
+        # # the pheromone level of all its links.
+        # #
+        # # I made it a function of how the current tour compares to the curent best tour.
+        # # 'update_weight' puts a weight on how much a good tour is considered important.
+        #
+        # raw_increment = 0.5
+        #
+        # for lnk in tour:
+        #     lnk.pheromone_level += min(max_increment(lnk), raw_increment)
 
 
 # ############################################## Define GUI ############################################## #
@@ -279,10 +337,10 @@ aco_gui_left_upper = [
                                  size=(10, 20))],
 
                       [sg.Text('alpha', pad=((0, 5), (10, 0))),
-                       sg.Slider(key='alpha', range=(0, 5), default_value=2, orientation='horizontal', size=(5, 20)),
+                       sg.Slider(key='alpha', range=(1, 5), default_value=2, orientation='horizontal', size=(5, 20)),
 
                        sg.Text('beta', pad=((10, 5), (10, 0))),
-                       sg.Slider(key='beta', range=(0, 5), default_value=2, orientation='horizontal', size=(5, 20))],
+                       sg.Slider(key='beta', range=(1, 5), default_value=2, orientation='horizontal', size=(5, 20))],
 
                       [sg.Text('update weight', pad=((0, 5), (10, 0))),
                        sg.Slider(key='update_weight', range=(1, 20), default_value=8, orientation='horizontal',
