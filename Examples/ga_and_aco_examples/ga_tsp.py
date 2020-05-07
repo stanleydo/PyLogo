@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from inspect import getmembers
-from random import choice, random, sample, uniform
+from random import choice, random, sample, uniform, randint
 from typing import List, Tuple
 
 from pygame import Color
@@ -110,8 +110,6 @@ class TSP_Chromosome(Chromosome):
 
             available_genes = [g for g in GA_World.gene_pool if g not in greedy_path]
 
-        print([agent.id for agent in greedy_path])
-
         return greedy_path
 
     @staticmethod
@@ -141,54 +139,56 @@ class TSP_Chromosome(Chromosome):
         # We will use the same starting point for the DFS tour
         start_gene = TSP_Chromosome.random_path()[0]
 
-        # Initialize list for mst
-        min_spanning_tree = []
+        # Initialize visited list
+        visited = [start_gene]
 
-        # Initialize fringe with the random gene
-        fringe = [start_gene]
+        # Initialize list of available genes
+        available_genes = [g for g in GA_World.gene_pool if g not in visited]
 
         # Initialize a dictionary of neighbors with the key being the gene
         # Value will be an empty list
         mst_neighbors = {gene: [] for gene in GA_World.gene_pool}
 
         # Start the search
-        while fringe:
-            # Pop the first element in the fringe and store it into cur_gene
-            cur_gene = fringe.pop(0)
-
-            # This serves as kind of a "visited" list.
-            # It shows the order in which we visited
-            min_spanning_tree.append(cur_gene)
-
+        while available_genes:
             # Min_dist is set to 99999 simply because no length in the GUI can reach over 99999.
             min_dist = 99999
-            # Initialize next_gene so we know what to add to our fringe next.
-            # Next_gene is a tuple =
-            # (what we will append to the fringe next, where it came from)
+
+            # Initialize gene_pair so we know what to add to our MST and visited list.
+            # (what we will visit next, where it came from)
             gene_pair: Tuple = None
 
             # Finds the smallest length link amongst all of the visited genes
             # Doesn't evaluate links to any genes that have already been visited.
-            for visited_gene in min_spanning_tree:
+            for visited_gene in visited:
                 # Find the minimum value link between the visited gene and unvisited genes.
-                for next_gene in [g for g in GA_World.gene_pool if g not in min_spanning_tree]:
+                for next_gene in available_genes:
                     dist = visited_gene.distance_to(next_gene)
                     if dist < min_dist:
                         min_dist = dist
                         gene_pair = (next_gene, visited_gene)
 
-            if gene_pair:
-                next_gene, parent_gene = gene_pair
-                # The next_gene is the gene that will be appended to the fringe next
-                # The parent gene (One we visited already) will have the next_gene as a neighbor.
-                mst_neighbors[parent_gene].append(next_gene)
-                fringe.append(next_gene)
+            next_gene, parent_gene = gene_pair
+            # The next_gene is the gene that will be appended to the visited list
+            # The parent gene (One we visited already) will have the next_gene as a neighbor in the MST dict.
+            mst_neighbors[parent_gene].append(next_gene)
+            visited.append(next_gene)
 
-        new_msp_links = []
-        for parent_gene in mst_neighbors.keys():
-            for neighbor in mst_neighbors[parent_gene]:
-                new_msp_links.append(TSP_Link(parent_gene, neighbor, add_to_world_links=False, color=Color('green'), width=2))
+            available_genes = [g for g in GA_World.gene_pool if g not in visited]
 
+        # Use the newly generated MST and do a DFS of it
+        dfs: List[Gene] = []
+        stack = [start_gene]
+
+        while stack:
+            cur = stack.pop(0)
+            if cur not in dfs:
+                dfs.append(cur)
+                neighbors = mst_neighbors[cur]
+                for nbr in [n for n in neighbors]:
+                    stack.insert(0, nbr)
+
+        return dfs
 
 
     def add_gene_to_chromosome(self, orig_fitness: float, gene):
@@ -260,9 +260,11 @@ class TSP_Chromosome(Chromosome):
         Currently calls move_gene_in_chromosome. Should be replaced with code that does two_opt.
         """
         # Pick 2 random points
-        points = sample(range(0, len(self)), 2)
-        while (points[0]+1 == points[1]):
-            points = sample(range(0, len(self)), 2)
+        left = randint(0, len(self)-2)
+        right = randint(left+2, len(self))
+        points = (left, right)
+
+        print(points)
 
         self_as_list = list(self)
         original_self = self_as_list.copy()
@@ -280,8 +282,6 @@ class TSP_Chromosome(Chromosome):
 
         # Return self (Since this is a TSP_Chromosome)
         return self
-
-
 
 # noinspection PyTypeChecker
 class TSP_Individual(Individual):

@@ -90,7 +90,7 @@ class Link:
         return sibs if len(sibs[0]) < len(sibs[1]) else (sibs[1], sibs[0])
 
 
-def draw_links(links, sleep_time=0.6):
+def draw_links(links, sleep_time=0.1):
     cached_world_links_set = World.links
     World.links = set()
     gui_set(gui.GOSTOP, text='pause', button_color=('white', 'red'), enabled=True)
